@@ -14,7 +14,7 @@ setup(
     install_requires=[
         'pyjwt',
         'sqlalchemy',
-        'pandas',
+        'pandas>=2.1.3',
         'numpy',
         'cryptography>=3.4.8,<4.0',
     ],

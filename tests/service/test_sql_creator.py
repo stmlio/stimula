@@ -23,6 +23,28 @@ def test_create_sql(meta, books, lexer):
     assert result == expected
 
 
+def test_create_sql_multiple_update_rows(meta, books, lexer):
+    # verify that it can create multiple rows with different columns
+    header = 'title[unique=true], authorid(name), description'
+    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    # create multi index series with self/other columns
+    columns = pd.MultiIndex.from_tuples([('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')])
+
+    updates = pd.DataFrame([
+        ['Pride and Prejudice', 'Charles Dickens', 'Jane Austen', NaN, NaN],
+        ['David Copperfield', NaN, NaN, 'A novel by Charles Dickens, narrated by ...', NaN],
+    ],
+        columns=columns
+    )
+    result = list(UpdateSqlCreator().create_sql(mapping, updates))
+
+    expected = [
+        ('update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', {'name': 'Charles Dickens', 'title': 'Pride and Prejudice'}),
+        ('update books set description = :description where books.title = :title', {'title': 'David Copperfield', 'description': 'A novel by Charles Dickens, narrated by ...'})
+    ]
+    assert result == expected
+
+
 def test_create_sql_row_insert(meta, books, lexer):
     # test that it creates an insert sql query and a value dict
     table_name = 'books'

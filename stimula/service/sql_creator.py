@@ -112,9 +112,11 @@ class SqlCreator:
         # create a list of items in tree where the corresponding header is in value_dict
         filter_columns = [item for item, header in zip(all_columns, headers) if header in value_dict]
 
-        mapping['columns'] = filter_columns
+        # create a copy of mapping with columns replaced by filtered columns
+        filtered_mapping = mapping.copy()
+        filtered_mapping['columns'] = filter_columns
 
-        return mapping
+        return filtered_mapping
 
     def _map_parameter_names_with_values(self, filtered_mapping, parameter_names, value_dict):
         # create a list of column headers
