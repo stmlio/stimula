@@ -184,3 +184,14 @@ def test_post_table_with_filter(db, books, context):
     ).astype(dtypes)
 
     assert df.equals(expected)
+
+def test_exception_when_all_columns_empty(db, books, context):
+    # validate that an exception is raised when all columns are empty
+    header = ','
+    body = '''
+        Emma,  
+    '''
+    # expect exception
+    with pytest.raises(ValueError, match="At least one column header must not be empty"):
+        db.post_table_get_sql('books', header, None, body)
+

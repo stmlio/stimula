@@ -237,6 +237,10 @@ class DB:
         # replace empty column names with skip, skip1, skip2. This is because pandas requires column names to be unique
         non_empty_column_names = list(self._replace_empty_columns_with_skip(column_names))
 
+        # assert that at least one column header is not empty
+        if not non_empty_column_names:
+            raise ValueError("At least one column header must not be empty")
+
         # find duplicate column names
         duplicate_column_names = self._find_duplicate_names(non_empty_column_names)
 
@@ -245,13 +249,13 @@ class DB:
             raise ValueError(f"Duplicate column names are not supported: {', '.join(duplicate_column_names)}")
 
         # list names of columns with datetime64 or date type, because we need to parse them as datetime
-        parse_dates = column_types['read_csv_parse_dates']
+        parse_dates = column_types.get('read_csv_parse_dates', {})
 
         # get converter dictionary
-        converters = column_types['read_csv_converters']
+        converters = column_types.get('read_csv_converters', {})
 
         # get dtypes for read_csv
-        dtype = column_types['read_csv_dtypes']
+        dtype = column_types.get('read_csv_dtypes', {})
 
         # read csv from request body
         # treat '' as missing value, but treat NA as string
