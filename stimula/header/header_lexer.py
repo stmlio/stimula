@@ -3,7 +3,7 @@ from .sly import Lexer
 
 class HeaderLexer(Lexer):
     # Set of token names.   This is always required
-    tokens = {ID, VALUE, QUOTED_VALUE, COMMA, COLON, EQUALS, LPAREN, RPAREN, LBRACK, RBRACK}
+    tokens = {ID, VALUE, QUOTED_VALUE, COLON, EQUALS, LPAREN, RPAREN, LBRACK, RBRACK}
 
     # String containing ignored characters between tokens
     ignore = ' \t'
@@ -12,7 +12,6 @@ class HeaderLexer(Lexer):
     ID = r'[a-zA-Z_][a-zA-Z0-9_-]*'
     VALUE = r'[a-zA-Z0-9_$]+'
     QUOTED_VALUE = r'"[^\"]+"'
-    COMMA = r'\,'
     COLON = r'\:'
     EQUALS = r'\='
     LPAREN = r'\('

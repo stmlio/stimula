@@ -129,8 +129,7 @@ def test_post_table_get_diff_with_default_values(db, books):
 
 
 def test_post_table_get_diff_with_expression(db, books):
-    header = 'title[unique=true],a[skip=true], b[skip=true], description[exp = "a.str.cat(b, sep=\' \')"]'
-    header = 'title[unique=true],a_x[skip=true], b[skip=true], description[exp="a_x.str.cat(b, sep=\' \')"]'
+    header = 'title[unique=true],a_x[skip=true], b[skip=true], "description[exp=""a_x.str.cat(b, sep=\' \')""]"'
 
     body = '''
         War and Peace,the new,description, 

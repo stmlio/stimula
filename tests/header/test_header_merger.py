@@ -8,7 +8,7 @@ def test_merge(books, meta, cr, lexer):
     default_mapping = OdooHeaderParser(meta, cr).parse('books')
 
     header = 'title[unique=true], authorid(name:birthyear)'
-    requested_mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    requested_mapping = HeaderParser(meta, table).parse_csv(header)
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 
@@ -34,7 +34,7 @@ def test_merge_empty_column_in_requested_header(books, meta, cr, lexer):
     default_mapping = OdooHeaderParser(meta, cr).parse('books')
 
     header = 'title[unique=true],'
-    requested_mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    requested_mapping = HeaderParser(meta, table).parse_csv(header)
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 
@@ -60,7 +60,7 @@ def test_merge_primary_key_as_unique_column(books, meta, cr, lexer):
     default_mapping = OdooHeaderParser(meta, cr).parse(table)
 
     header = 'property_id[unique=true], name'
-    requested_mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    requested_mapping = HeaderParser(meta, table).parse_csv(header)
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 

@@ -8,7 +8,7 @@ from stimula.service.diff_to_sql import DiffToSql
 # test diff_sql method
 def test_diff_sql(books, meta, lexer):
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, 'books').parse_csv(header)
 
     inserts = pd.DataFrame([
         ['Pride and Prejudice', 'Jane Austen'],

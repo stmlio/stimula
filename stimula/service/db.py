@@ -81,7 +81,7 @@ class DB:
 
         else:
             # parse header to build syntax tree
-            mapping = HeaderParser(metadata, table_name).parse(self._lexer.tokenize(header))
+            mapping = HeaderParser(metadata, table_name).parse_csv(header)
 
         query = SelectCompiler().compile_count_query(mapping, where_clause)
 
@@ -108,7 +108,7 @@ class DB:
 
         else:
             # parse header to build syntax tree
-            mapping = HeaderParser(metadata, table_name).parse(self._lexer.tokenize(header))
+            mapping = HeaderParser(metadata, table_name).parse_csv(header)
 
         df = self._read_from_db(mapping, where_clause)
 
@@ -212,7 +212,7 @@ class DB:
         cnx = cnx_context.cnx
 
         # parse header to build syntax tree
-        mapping = HeaderParser(get_metadata(cnx), table_name).parse(self._lexer.tokenize(header))
+        mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
 
         # read dataframe from request first, so we can give feedback on errors in the request
         df_request = self._read_from_request(mapping, body, skiprows)
@@ -234,12 +234,12 @@ class DB:
         index_columns = HeaderCompiler().compile_list_unique(mapping)
         column_types = TypesCompiler().compile(mapping, column_names, include_skip=True)
 
+        # assert that at least one column header is not empty
+        if not [c for c in column_names if c != '']:
+            raise ValueError("At least one column header must not be empty")
+
         # replace empty column names with skip, skip1, skip2. This is because pandas requires column names to be unique
         non_empty_column_names = list(self._replace_empty_columns_with_skip(column_names))
-
-        # assert that at least one column header is not empty
-        if not non_empty_column_names:
-            raise ValueError("At least one column header must not be empty")
 
         # find duplicate column names
         duplicate_column_names = self._find_duplicate_names(non_empty_column_names)
@@ -390,7 +390,7 @@ class DB:
         cnx = cnx_context.cnx
 
         # parse header to build mapping
-        mapping = HeaderParser(get_metadata(cnx), table_name).parse(self._lexer.tokenize(header))
+        mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
 
         # Read data from the database table using pandas
         query = self._create_select_query(mapping, where_clause)
@@ -431,7 +431,7 @@ class DB:
             return mapping
 
         # parse header to build syntax tree
-        parsed_header = HeaderParser(metadata, table_name).parse(self._lexer.tokenize(header))
+        parsed_header = HeaderParser(metadata, table_name).parse_csv(header)
 
         # merge headers
         merged_mapping = HeaderMerger().merge(mapping, parsed_header)
@@ -508,7 +508,7 @@ class DB:
         cnx = cnx_context.cnx
 
         # parse header to build syntax tree
-        mapping = HeaderParser(get_metadata(cnx), table_name).parse(self._lexer.tokenize(header))
+        mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
 
         # reconstruct original header from tree
         column_keys = HeaderCompiler().compile_list(mapping)

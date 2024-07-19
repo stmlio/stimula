@@ -6,7 +6,7 @@ def test_columns(books, lexer, meta):
     # verify that compiler returns a converter to read json string as dict
     table = 'properties'
     header = 'name, jsonb'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     types = TypesCompiler().compile(mapping, header.split(', '))
     converter = types['read_csv_converters']['jsonb']
     # check converter exists
@@ -49,7 +49,7 @@ def test_dtypes(books, lexer, meta):
     # verify that compiler returns a converter to read json string as dict
     table = 'properties'
     header = 'property_id, name, value, number, float, decimal, timestamp, date, jsonb'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     types = TypesCompiler().compile(mapping, header.split(', '))
     dtypes = types['read_csv_dtypes']
     expected = {'date': 'object',

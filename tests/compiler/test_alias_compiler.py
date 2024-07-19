@@ -5,7 +5,7 @@ from stimula.header.csv_header_parser import HeaderParser
 def test_columns(books, lexer, meta):
     table = 'books'
     header = 'title, price'
-    result = AliasCompiler().compile(HeaderParser(meta, table).parse(lexer.tokenize(header)))
+    result = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     expected = {'table': 'books', 'columns': [
         {'attributes': [{'name': 'title', 'parameter': 'title', 'type': 'text'}], 'enabled': True},
         {'attributes': [{'name': 'price', 'parameter': 'price', 'type': 'numeric'}], 'enabled': True}]}
@@ -14,7 +14,7 @@ def test_columns(books, lexer, meta):
 def test_modifiers(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], price[x=1: y=2]'
-    result = AliasCompiler().compile(HeaderParser(meta, table).parse(lexer.tokenize(header)))
+    result = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     expected = {'table': 'books', 'columns': [
         {'attributes': [{'name': 'title', 'parameter': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
         {'attributes': [{'name': 'price', 'parameter': 'price', 'type': 'numeric'}], 'x': '1', 'y': '2', 'enabled': True}
@@ -24,7 +24,7 @@ def test_modifiers(books, lexer, meta):
 def test_multiple_attributes(books, lexer, meta):
     table = 'books'
     header = 'bookid:title[unique=true], price'
-    result = AliasCompiler().compile(HeaderParser(meta, table).parse(lexer.tokenize(header)))
+    result = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     expected = {'table': 'books', 'columns': [
         {'attributes': [{'name': 'bookid', 'parameter': 'bookid', 'type': 'integer'}, {'name': 'title', 'parameter': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
         {'attributes': [{'name': 'price', 'parameter': 'price', 'type': 'numeric'}], 'enabled': True}]}
@@ -33,7 +33,7 @@ def test_multiple_attributes(books, lexer, meta):
 def test_foreign_key(books, lexer, meta):
     table = 'books'
     header = 'authorid(name:publisherid(publishername:country):birthyear)'
-    result = AliasCompiler().compile(HeaderParser(meta, table).parse(lexer.tokenize(header)))
+    result = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     expected = {'table': 'books', 'columns': [
         {'attributes': [
             {'name': 'authorid', 'foreign-key': {'table': 'authors', 'alias': 'authors', 'name': 'author_id', 'attributes': [
@@ -52,7 +52,7 @@ def test_foreign_key(books, lexer, meta):
 def test_alias(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], seriesid(title)'
-    result = AliasCompiler().compile(HeaderParser(meta, table).parse(lexer.tokenize(header)))
+    result = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     expected = {'table': 'books', 'columns': [
         {'attributes': [{'name': 'title', 'parameter': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
         {'attributes': [

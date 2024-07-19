@@ -2,10 +2,10 @@ from stimula.header.header_lexer import HeaderLexer
 
 
 def test_header():
-    data = 'abc, d:e, e(fg)[h=i:j=123]'
+    data = ' e(fg)[h=i:j=123]'
     lexer = HeaderLexer()
     tokens = list(lexer.tokenize(data))
-    assert len(tokens) == 19
+    assert len(tokens) == 13
 
 
 def test_header_with_quoted_specifier_value():

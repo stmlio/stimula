@@ -194,7 +194,7 @@ def _test_post_jsonb_with_unicode(db, cnx, books, context):
 def test_conversion_of_json_with_null_value(db, meta, lexer):
     table = 'properties'
     header = 'name, jsonb'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
 
     # test that DB can correctly convert a df with a json that has a null value
     df = pd.DataFrame([

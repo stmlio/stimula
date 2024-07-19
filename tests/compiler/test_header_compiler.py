@@ -5,7 +5,7 @@ from stimula.header.csv_header_parser import HeaderParser
 
 def test_empty(meta, lexer):
     header = ''
-    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, 'books').parse_csv(header)
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -16,7 +16,7 @@ def test_empty(meta, lexer):
 def test_columns(books, lexer, meta):
     table = 'books'
     header = 'title, price'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -27,7 +27,7 @@ def test_columns(books, lexer, meta):
 def test_modifiers(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], price[x=1: y=2]'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -41,7 +41,7 @@ def test_modifiers(books, lexer, meta):
 def test_modifier_with_quoted_value(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], price[filter="$ = \'abc\'"]'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
 
@@ -49,7 +49,7 @@ def test_modifier_with_quoted_value(books, lexer, meta):
 def test_multiple_attributes(books, lexer, meta):
     table = 'books'
     header = 'bookid:title[unique=true], price'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -62,7 +62,7 @@ def test_multiple_attributes(books, lexer, meta):
 def test_foreign_key(books, lexer, meta):
     table = 'books'
     header = 'authorid(name:publisherid(publishername:country):birthyear)'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -95,34 +95,38 @@ def test_type(books, lexer, meta):
 def test_list(books, lexer, meta):
     table = 'books'
     header = 'title, price'
-    mapping = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     list = HeaderCompiler().compile_list(mapping)
     assert list == ['title', 'price']
 
 
 def test_unique_columns(books, lexer, meta):
+    table = 'books'
     header = ' bookid: title [unique =true], price  '
-    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     csv = HeaderCompiler().compile_csv_unique(mapping)
     assert csv == 'bookid:title[unique=true]'
 
 
 def test_unique_list(books, lexer, meta):
+    table = 'books'
     header = ' bookid: title [unique =true], price  '
-    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     list = HeaderCompiler().compile_list_unique(mapping)
     assert list == ['bookid:title[unique=true]']
 
 
 def test_non_unique_list(books, lexer, meta):
+    table = 'books'
     header = ' bookid: title [unique =true], price  '
-    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     list = HeaderCompiler().compile_list_non_unique(mapping)
     assert list == ['price']
 
 
 def test_list_with_skip(books, lexer, meta):
+    table = 'books'
     header = ' title [unique =true], price, xyz[skip=true]  '
-    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    mapping = HeaderParser(meta, table).parse_csv(header)
     list = HeaderCompiler().compile_list(mapping)
     assert list == ['title[unique=true]', 'price']

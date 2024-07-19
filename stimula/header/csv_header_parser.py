@@ -2,16 +2,13 @@
 This class parses a text format mapping header. It connects to the database to verify the existence of tables and columns
 and it resolves foreign key references.
 
+This parser is not thread safe, because it uses a stack to keep track of the current table and column. Make sure that
+each thread has its own instance of this parser.
+
 Author: Romke Jonker
 Email: romke@rnadesign.net
 
 The grammar is as follows:
-
-row        : cells
-           | empty
-
-cells      : cells, cell
-           | cell
 
 cell       : columns [ modifiers ]
            | columns
@@ -30,6 +27,8 @@ modifier   : ID = ID
            | ID = VALUE
 
 """
+import csv
+import io
 
 from .header_lexer import HeaderLexer
 from .sly import Parser
@@ -38,23 +37,54 @@ from .sly import Parser
 class HeaderParser(Parser):
     # CSV headers that are treated as boolean
     BOOLEAN_HEADERS = ['unique', 'skip']
+    _lexer = HeaderLexer()
 
     def __init__(self, metadata, table_name):
         self.metadata = metadata
-        # push table name on stack
-        self.table_stack = [(self._resolve_table(table_name), None)]
+        self._table_name = table_name
 
     # Get the token list from the lexer (required)
     tokens = HeaderLexer.tokens
 
-    # Grammar rules and actions
-    # @_('empty')
-    # def row(self, p):
-    #     table, _ = self.table_stack.pop()
-    #     assert not self.table_stack, 'table stack should be empty after parsing'
-    #     return {'table': table.name}
+    # main parse function that starts with decoding CSV style headers
+    def parse_csv(self, header):
+        # resolve table
+        table = self._resolve_table(self._table_name)
 
-    @_('cells')
+        # an empty string can either be an empty header or a header with a single empty column. Let's return an empty header in that case.
+        if header.strip() == '':
+            return {'table': self._table_name}
+
+        # decode CSV style header
+        csv_file = io.StringIO(header)
+
+        # Create a CSV reader object
+        csv_reader = csv.reader(csv_file, delimiter=',', quotechar='"', skipinitialspace=True)
+
+        # Parse the single line into a list of cells
+        cells = next(csv_reader)
+
+        # push table name on stack
+        self.table_stack = [(table, None)]
+
+        # parse the cells
+        parsed_cells = [self.parse(HeaderParser._lexer.tokenize(cell)) for cell in cells]
+
+        # pop the stack and verify it's empty
+        table, _ = self.table_stack.pop()
+        assert not self.table_stack, 'table stack should be empty after parsing'
+
+        # Verify that all attributes exist in the table by checking that they have a type.
+        # For columns marked as 'skip=true', the column does not have to exist in the table.
+        # We can't do this check during parsing of the attribute, bec/ then the modifiers aren't known yet.
+        for cell in parsed_cells:
+            if not cell.get('skip'):
+                for a in cell.get('attributes', []):
+                    self._verify_attribute(a, table.name)
+
+        return {'table': table.name, 'columns': parsed_cells}
+
+    # @_('cells')
     def row(self, p):
         table, _ = self.table_stack.pop()
         assert not self.table_stack, 'table stack should be empty after parsing'
@@ -82,14 +112,6 @@ class HeaderParser(Parser):
         else:
             if 'type' not in attribute:
                 raise ValueError(f"Column '{attribute['name']}' not found in table '{table}'")
-
-    @_('cells COMMA cell')
-    def cells(self, p):
-        return p.cells + [p.cell]
-
-    @_('cell')
-    def cells(self, p):
-        return [p.cell]
 
     @_('columns LBRACK modifiers RBRACK')
     def cell(self, p):
