@@ -27,10 +27,17 @@ def test_columns(books, lexer, meta):
 
 
 def test_columns_not_found(books, lexer, meta):
+    # test that an error is raised when a column is not found in the table
     table = 'books'
     header = 'title, pricexxx'
     with pytest.raises(ValueError, match="Column 'pricexxx' not found in table 'books'"):
         HeaderParser(meta, table).parse(lexer.tokenize(header))
+
+def test_columns_not_found_with_skip(books, lexer, meta):
+    # test that an error is ignored if the missing column is marked as skip=true, so we can read the column from CSV and use it in an expression
+    table = 'books'
+    header = 'title, pricexxx[skip=true]'
+    HeaderParser(meta, table).parse(lexer.tokenize(header))
 
 
 def test_modifiers(books, lexer, meta):

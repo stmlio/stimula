@@ -36,6 +36,9 @@ from .sly import Parser
 
 
 class HeaderParser(Parser):
+    # CSV headers that are treated as boolean
+    BOOLEAN_HEADERS = ['unique', 'skip']
+
     def __init__(self, metadata, table_name):
         self.metadata = metadata
         # push table name on stack
@@ -61,7 +64,24 @@ class HeaderParser(Parser):
         if not any('attributes' in c for c in cells):
             return {'table': table.name}
 
+        # Verify that all attributes exist in the table by checking that they have a type.
+        # For columns marked as 'skip=true', the column does not have to exist in the table.
+        # We can't do this check during parsing of the attribute, bec/ then the modifiers aren't known yet.
+        for cell in cells:
+            if not cell.get('skip'):
+                for a in cell.get('attributes', []):
+                    self._verify_attribute(a, table.name)
+
         return {'table': table.name, 'columns': p.cells}
+
+    def _verify_attribute(self, attribute, table):
+        if 'foreign-key' in attribute:
+            foreign_key = attribute['foreign-key']
+            for a in foreign_key.get('attributes', []):
+                self._verify_attribute(a, foreign_key['table'])
+        else:
+            if 'type' not in attribute:
+                raise ValueError(f"Column '{attribute['name']}' not found in table '{table}'")
 
     @_('cells COMMA cell')
     def cells(self, p):
@@ -109,7 +129,9 @@ class HeaderParser(Parser):
         # verify column exists
         table, _ = self.table_stack[-1]
         if p.ID not in table.columns:
-            raise ValueError(f"Column '{p.ID}' not found in table '{table.name}'")
+            # column does not exist, this is fine for [skip=true] columns
+            return {'name': p.ID}
+
         column = table.columns[p.ID]
 
         return {
@@ -129,7 +151,7 @@ class HeaderParser(Parser):
     @_('ID EQUALS VALUE')
     def modifier(self, p):
         key = p[0]
-        if key in ['unique']:
+        if key in self.BOOLEAN_HEADERS:
             # boolean modifier
             value = str(p[2]).lower() == 'true'
         else:

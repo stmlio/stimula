@@ -127,6 +127,21 @@ def test_post_table_get_diff_with_default_values(db, books):
 
     assert update.values.tolist() == expected_update
 
+
+def test_post_table_get_diff_with_expression(db, books):
+    header = 'title[unique=true],a[skip=true], b[skip=true], description[exp = "a.str.cat(b, sep=\' \')"]'
+    header = 'title[unique=true],a_x[skip=true], b[skip=true], description[exp="a_x.str.cat(b, sep=\' \')"]'
+
+    body = '''
+        War and Peace,the new,description, 
+    '''
+    create, update, delete = db.post_table_get_diff('books', header, None, body, update=True)
+
+    expected_update = [['War and Peace', 'the new description', '']]
+
+    assert update.values.tolist() == expected_update
+
+
 def test_post_table_get_sql_no_changes(db, books, context):
     body = '''
         Emma, Jane Austen

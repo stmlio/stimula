@@ -47,8 +47,8 @@ class SelectCompiler:
 class SelectClauseCompiler:
     def compile(self, mapping):
         table_name = mapping['table']
-        # comma separate cells
-        return 'select ' + ', '.join([self._column(c, table_name) for c in mapping['columns']])
+        # comma separate cells. Skip cells with skip=true modifier. We need those when reading CSV, but not when reading from DB
+        return 'select ' + ', '.join([self._column(c, table_name) for c in mapping['columns'] if not c.get('skip')])
 
     def _column(self, column, table_name):
         # column may be empty

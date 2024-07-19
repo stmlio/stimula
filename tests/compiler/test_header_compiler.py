@@ -119,3 +119,10 @@ def test_non_unique_list(books, lexer, meta):
     mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
     list = HeaderCompiler().compile_list_non_unique(mapping)
     assert list == ['price']
+
+
+def test_list_with_skip(books, lexer, meta):
+    header = ' title [unique =true], price, xyz[skip=true]  '
+    mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
+    list = HeaderCompiler().compile_list(mapping)
+    assert list == ['title[unique=true]', 'price']

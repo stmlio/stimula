@@ -19,14 +19,13 @@ import pandas as pd
 
 class TypesCompiler:
 
-
-    def compile(self, mapping, column_names):
+    def compile(self, mapping, column_names, include_skip=False):
         # only return enabled columns
         if 'columns' not in mapping:
             return {}
 
-        # process all columns to obtain the converters, include empty columns
-        columns = [self._column(c) for c in mapping['columns']]
+        # process all columns to obtain the converters, include empty columns, but skip [skip=true] columsn unless otherwise requested
+        columns = [self._column(c) for c in mapping['columns'] if (not c.get('skip') or include_skip)]
 
         # create a dictionary of converters to read from csv
         read_csv_converters = {column_names[i]: column['read_csv_converter'] for i, column in enumerate(columns) if 'read_csv_converter' in column}
@@ -62,16 +61,16 @@ class TypesCompiler:
         result = {}
 
         # to read json from csv, we need to convert the string to json
-        if len(attributes) == 1 and attributes[0]['type'] == 'jsonb':
+        if len(attributes) == 1 and attributes[0].get('type') == 'jsonb':
             result['read_csv_converter'] = json_to_dict
             result['write_csv_converter'] = dict_to_json
 
         # to read binary string from csv, we need to convert the string to binary
-        if len(attributes) == 1 and attributes[0]['type'] == 'bytea':
+        if len(attributes) == 1 and attributes[0].get('type') == 'bytea':
             result['read_csv_converter'] = binary_string_converter
 
         # to read binary string from db, we need to convert the binary to string
-        if len(attributes) == 1 and attributes[0]['type'] == 'bytea':
+        if len(attributes) == 1 and attributes[0].get('type') == 'bytea':
             result['read_db_converter'] = memoryview_to_string_converter
 
         # set whether to parse the column as a date
@@ -79,7 +78,7 @@ class TypesCompiler:
             result['read_csv_parse_dates'] = True
 
         # convert date to pandas datetime when reading from db
-        if len(attributes) == 1 and attributes[0]['type'] == 'date':
+        if len(attributes) == 1 and attributes[0].get('type') == 'date':
             result['read_db_converter'] = date_to_datetime_converter
 
         # get the dtype for this column
@@ -237,6 +236,7 @@ def memoryview_to_string_converter(mv):
             # if all fails, return as binary
             return mv.tobytes()
 
+
 def date_to_datetime_converter(date):
     # return None for empty values
     if date is None:
@@ -249,21 +249,18 @@ def date_to_datetime_converter(date):
 # Custom converter function to set default values when reading CSV
 def default_value_converter(dtype, default):
     # pandas ignores dtype if a converter is set, so we need to convert the value to the correct type
-    return lambda value: _get_value_or_default(dtype, default, value)
+    return lambda value: _convert_to_dtype(dtype, value if value is not None and value != '' else default)
 
 
-def _get_value_or_default(dtype, default, value):
-    #  if dtype is boolean, then convert string to boolean, ignore case
+def _convert_to_dtype(dtype, value):
     if dtype == 'boolean':
-        return value.lower() == 'true' if value is not None and value != '' else default.lower() == 'true'
+        return value.lower() == 'true'
 
-    # if dtype is integer, then convert string to integer
     if dtype == 'Int64':
-        return int(value) if value is not None and value != '' else int(default)
+        return int(value)
 
-    # if dtype is float, then convert string to float
     if dtype == 'float':
-        return float(value) if value is not None and value != '' else float(default)
+        return float(value)
 
-    # else return value or default, but don't convert
-    return value if value is not None and value != '' else default
+    return value
+

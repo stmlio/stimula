@@ -103,13 +103,17 @@ class SqlCreator:
         return non_unique_value_dict
 
     def _filter_mapping(self, mapping, value_dict):
+        # filter columns by those that have a value in value_dict
+
         # create a list of column headers
-        headers = HeaderCompiler().compile_list(mapping)
+        headers = HeaderCompiler().compile_list(mapping, include_skip=True)
 
         # create a list of all columns
         all_columns = mapping['columns']
 
-        # create a list of items in tree where the corresponding header is in value_dict
+        assert len(headers) == len(all_columns), f'Number of headers must equal number of columns, found: {len(headers)} and {len(all_columns)}'
+
+        # create a list of items in mapping where the corresponding header is in value_dict
         filter_columns = [item for item, header in zip(all_columns, headers) if header in value_dict]
 
         # create a copy of mapping with columns replaced by filtered columns

@@ -23,11 +23,12 @@ class HeaderCompiler:
             return ''
         return ', '.join([self._column(c) for c in mapping['columns'] if c.get('unique', False)])
 
-    def compile_list(self, mapping, enabled=False):
-        # if enabled, only return enabled columns
+    def compile_list(self, mapping, enabled=False, include_skip=False):
+        # if enabled, only return enabled columns.
+        # if include_skip, then include skip columns. This is useful when reading from CSV
         if 'columns' not in mapping:
             return []
-        return [self._column(c) for c in mapping['columns'] if (not enabled or c.get('enabled', False))]
+        return [self._column(c) for c in mapping['columns'] if (not enabled or c.get('enabled', False)) and (include_skip or not c.get('skip'))]
 
     def compile_list_unique(self, mapping):
         if 'columns' not in mapping:
@@ -35,6 +36,7 @@ class HeaderCompiler:
         return [self._column(c) for c in mapping['columns'] if c.get('unique', False)]
 
     def compile_list_non_unique(self, mapping):
+        # return list of non-unique columns
         if 'columns' not in mapping:
             return []
         columns = [self._column(c) for c in mapping['columns'] if not c.get('unique', False)]
@@ -67,7 +69,7 @@ class HeaderCompiler:
         return f"({key})", type
 
     def _modifiers(self, column):
-        # use an exclusion list so we can add more attributes later
+        # use an exclusion list, so we can add more attributes later
         modifiers = [self._modifier(key, column[key]) for key in sorted(column.keys()) if key not in self.NON_MODIFIER_ATTRIBUTES]
         if not modifiers:
             return ''

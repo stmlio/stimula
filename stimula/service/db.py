@@ -229,10 +229,10 @@ class DB:
         return diffs, sqls
 
     def _read_from_request(self, mapping, body, skiprows):
-        # get columns and unique columns
-        column_names = HeaderCompiler().compile_list(mapping)
+        # get columns and unique columns.
+        column_names = HeaderCompiler().compile_list(mapping, include_skip=True)
         index_columns = HeaderCompiler().compile_list_unique(mapping)
-        column_types = TypesCompiler().compile(mapping, column_names)
+        column_types = TypesCompiler().compile(mapping, column_names, include_skip=True)
 
         # replace empty column names with skip, skip1, skip2. This is because pandas requires column names to be unique
         non_empty_column_names = list(self._replace_empty_columns_with_skip(column_names))
@@ -274,7 +274,36 @@ class DB:
             keep_default_na=False
         )
 
+        # evaluate column expressions
+        self._evaluate_expressions(df, mapping)
+
         return df
+
+    def _evaluate_expressions(self, df, mapping):
+        # a column header can contain a python expression. Evaluate these now that we've read all values from CSV.
+
+        # store original column names so we can restore them later
+        original_column_names = df.columns
+
+        # remove modifiers in column names so we can use the bare names in expressions
+        df.columns = df.columns.str.replace(r'\[.*\]', '', regex=True)
+
+        # now that we have all data, we can evaluate column expressions.
+        for column in mapping['columns']:
+            if 'exp' in column:
+                # get column name, assuming a single attribute
+                column_name = column['attributes'][0]['name']
+
+                # evaluate expression of the form <target_column>=<expression>
+                expression = f"{column_name}={column['exp']}"
+                df.eval(expression, inplace=True)
+
+        # restore column names
+        df.columns = original_column_names
+
+        # remove skip columns, because we've evaluated expressions so we no longer need them. Match column name with 'skip=true':
+        df.drop(columns=[column for column in df.columns if 'skip=true' in column], errors='ignore', inplace=True)
+
 
     def _read_from_db(self, mapping, where_clause, set_index=False):
         # get sqlalchemy engine from context
