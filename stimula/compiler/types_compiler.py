@@ -1,6 +1,13 @@
 """
 This class returns the dtypes and converters for columns that require special handling.
 
+For a column, it may add a read_csv_converter that pandas can use to read the column from a CSV file into a data frame.
+This typically happens when the user posts table contents.
+
+For a column, it may add a write_csv_converter that pandas can use to write the column from a data frame to a CSV file.
+This typically happens when the user requests table contents.
+
+
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
@@ -67,9 +74,6 @@ class TypesCompiler:
         if len(attributes) == 1 and attributes[0]['type'] == 'bytea':
             result['read_db_converter'] = memoryview_to_string_converter
 
-        # set the dtype for read_csv
-        result['read_csv_dtype'] = self._dtype(attributes)
-
         # set whether to parse the column as a date
         if self._date_type(attributes):
             result['read_csv_parse_dates'] = True
@@ -78,6 +82,16 @@ class TypesCompiler:
         if len(attributes) == 1 and attributes[0]['type'] == 'date':
             result['read_db_converter'] = date_to_datetime_converter
 
+        # get the dtype for this column
+        dtype = self._dtype(attributes)
+
+        # set converter if column has a default value, so that pandas can set it right when reading the posted CSV
+        if 'default-value' in column:
+            result['read_csv_converter'] = default_value_converter(dtype, column['default-value'])
+
+        # set the dtype, but only if there's no converter to read CSV, because pandas ignores the dtype with a warning if a converter is set
+        if 'read_csv_converter' not in result:
+            result['read_csv_dtype'] = dtype
 
         return result
 
@@ -230,3 +244,26 @@ def date_to_datetime_converter(date):
 
     # convert date from database to pandas datetime, so that we can accurately compare it to a date read from CSV
     return pd.to_datetime(date)
+
+
+# Custom converter function to set default values when reading CSV
+def default_value_converter(dtype, default):
+    # pandas ignores dtype if a converter is set, so we need to convert the value to the correct type
+    return lambda value: _get_value_or_default(dtype, default, value)
+
+
+def _get_value_or_default(dtype, default, value):
+    #  if dtype is boolean, then convert string to boolean, ignore case
+    if dtype == 'boolean':
+        return value.lower() == 'true' if value is not None and value != '' else default.lower() == 'true'
+
+    # if dtype is integer, then convert string to integer
+    if dtype == 'Int64':
+        return int(value) if value is not None and value != '' else int(default)
+
+    # if dtype is float, then convert string to float
+    if dtype == 'float':
+        return float(value) if value is not None and value != '' else float(default)
+
+    # else return value or default, but don't convert
+    return value if value is not None and value != '' else default

@@ -107,3 +107,15 @@ def test_reference_column_not_found(books, lexer, meta):
     header = 'authorxxx(name)'
     with pytest.raises(ValueError, match="Column 'authorxxx' not found in table 'books'"):
         HeaderParser(meta, table).parse(lexer.tokenize(header))
+
+
+def test_default_value_header(books, lexer, meta):
+    table = 'books'
+    header = 'title[unique=true], price[default-value=10], description[default-value="this is a book"]'
+    result = HeaderParser(meta, table).parse(lexer.tokenize(header))
+    expected = {'table': 'books', 'columns': [
+        {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
+        {'attributes': [{'name': 'price', 'type': 'numeric'}], 'default-value': '10', 'enabled': True},
+        {'attributes': [{'name': 'description', 'type': 'text'}], 'default-value': 'this is a book', 'enabled': True}
+    ], }
+    assert result == expected

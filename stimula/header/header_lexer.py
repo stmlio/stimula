@@ -9,7 +9,7 @@ class HeaderLexer(Lexer):
     ignore = ' \t'
 
     # Regular expression rules for tokens
-    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    ID = r'[a-zA-Z_][a-zA-Z0-9_-]*'
     VALUE = r'[a-zA-Z0-9_$]+'
     QUOTED_VALUE = r'"[^\"]+"'
     COMMA = r'\,'

@@ -147,7 +147,7 @@ def test_create_unique_value_dict(books, meta, lexer):
 
 
 def test_create_non_unique_value_dict(books, meta, lexer):
-    # test that non-unique headers are used as keys
+    # test that non-unique headers are used as keys in the key-value map
     header = 'title[unique=true], authorid(name)'
     mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
     AliasCompiler().compile(mapping)
@@ -160,7 +160,7 @@ def test_create_non_unique_value_dict(books, meta, lexer):
 
 
 def test_create_non_unique_value_dict_for_insert(books, meta, lexer):
-    # test that non-unique headers are used as keys
+    # test that empty values are ignored in the key-value map
     header = 'title[unique=true], price'
     mapping = HeaderParser(meta, 'books').parse(lexer.tokenize(header))
     AliasCompiler().compile(mapping)

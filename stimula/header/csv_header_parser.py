@@ -129,7 +129,7 @@ class HeaderParser(Parser):
     @_('ID EQUALS VALUE')
     def modifier(self, p):
         key = p[0]
-        if key in ['primary-key', 'unique', 'default', 'enabled', 'in-use']:
+        if key in ['unique']:
             # boolean modifier
             value = str(p[2]).lower() == 'true'
         else:

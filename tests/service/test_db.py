@@ -117,6 +117,16 @@ def test_post_table_get_diff_with_changes(db, books):
     assert delete.values.tolist() == expected_delete
 
 
+def test_post_table_get_diff_with_default_values(db, books):
+    body = '''
+        Emma,, 
+    '''
+    create, update, delete = db.post_table_get_diff('books', 'title[unique=true], authorid(name)[default-value="Jane Austen"], price[default-value=20]', None, body, update=True)
+
+    expected_update = [['Emma', 20, 10.99]]
+
+    assert update.values.tolist() == expected_update
+
 def test_post_table_get_sql_no_changes(db, books, context):
     body = '''
         Emma, Jane Austen

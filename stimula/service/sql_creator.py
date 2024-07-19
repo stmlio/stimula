@@ -27,7 +27,7 @@ from psycopg2._json import Json
 
 from ..compiler.alias_compiler import AliasCompiler
 from ..compiler.delete_compiler import DeleteCompiler
-from ..compiler .header_compiler import HeaderCompiler
+from ..compiler.header_compiler import HeaderCompiler
 from ..compiler.insert_compiler import InsertCompiler
 from ..compiler.parameters_compiler import ParametersCompiler
 from ..compiler.update_compiler import UpdateCompiler
