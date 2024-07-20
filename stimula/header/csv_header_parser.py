@@ -74,6 +74,10 @@ class HeaderParser(Parser):
         table, _ = self.table_stack.pop()
         assert not self.table_stack, 'table stack should be empty after parsing'
 
+        # for extension relations, we still have to resolve the foreign key table using the modifiers
+        for cell in parsed_cells:
+            self._complete_extension_foreign_key(cell, cell)
+
         # Verify that all attributes exist in the table by checking that they have a type.
         # For columns marked as 'skip=true', the column does not have to exist in the table.
         # We can't do this check during parsing of the attribute, bec/ then the modifiers aren't known yet.
@@ -84,26 +88,6 @@ class HeaderParser(Parser):
 
         return {'table': table.name, 'columns': parsed_cells}
 
-    # @_('cells')
-    def row(self, p):
-        table, _ = self.table_stack.pop()
-        assert not self.table_stack, 'table stack should be empty after parsing'
-        cells = p.cells
-
-        # this parser can not distinguish between an empty header and a header with a single empty column. Let's return an empty header in that case.
-        if not any('attributes' in c for c in cells):
-            return {'table': table.name}
-
-        # Verify that all attributes exist in the table by checking that they have a type.
-        # For columns marked as 'skip=true', the column does not have to exist in the table.
-        # We can't do this check during parsing of the attribute, bec/ then the modifiers aren't known yet.
-        for cell in cells:
-            if not cell.get('skip'):
-                for a in cell.get('attributes', []):
-                    self._verify_attribute(a, table.name)
-
-        return {'table': table.name, 'columns': p.cells}
-
     def _verify_attribute(self, attribute, table):
         if 'foreign-key' in attribute:
             foreign_key = attribute['foreign-key']
@@ -112,6 +96,51 @@ class HeaderParser(Parser):
         else:
             if 'type' not in attribute:
                 raise ValueError(f"Column '{attribute['name']}' not found in table '{table}'")
+
+    def _complete_extension_foreign_key(self, modifiers, cell_or_foreign_key):
+        # for extension relations, we need to complete the foreign key once we have parsed the modifiers
+        for attribute in cell_or_foreign_key.get('attributes', []):
+            if 'foreign-key' in attribute:
+                foreign_key = attribute['foreign-key']
+                if 'table' in foreign_key:
+                    # this is a proper foreign key, recurse to see if it has extension relations
+                    self._complete_extension_foreign_key(modifiers, foreign_key)
+
+                else:
+                    # this may be an extension relation, we need to resolve the foreign key table and column
+
+                    # find foreign table name in cell and remove the attribute
+                    if 'table' not in cell_or_foreign_key:
+                        raise ValueError(f"Column '{attribute['name']}' is not a foreign key and no 'table' specified in modifiers")
+                    table = self._resolve_table(modifiers['table'])
+                    del modifiers['table']
+
+                    # find referred column in cell and remove the attribute
+                    if 'name' not in modifiers:
+                        raise ValueError(f"Column '{attribute['name']}' is not a foreign key and no referred 'name' specified in modifiers")
+                    column_name = modifiers['name']
+                    del modifiers['name']
+
+                    if column_name not in table.columns:
+                        raise ValueError(f"Column '{column_name}' not found in table '{table}'")
+                    foreign_key['table'] = table.name
+                    foreign_key['name'] = column_name
+
+                    # Odoo's ir_model_data requires a qualifier name. Find it in cell and remove the attribute.
+                    if 'qualifier' not in modifiers:
+                        raise ValueError(f"Column '{attribute['name']}' is not a foreign key and no 'qualifier' specified in modifiers")
+                    foreign_key['qualifier'] = modifiers['qualifier']
+                    del modifiers['qualifier']
+
+                    # mark the foreign key as extension
+                    foreign_key['extension'] = True
+
+                    # also fix attribute types
+                    for a in foreign_key.get('attributes', []):
+                        if a['name'] not in table.columns:
+                            raise ValueError(f"Column '{a['name']}' not found in table '{table}'")
+                        type = str(table.columns[a['name']].type).lower()
+                        a['type'] = type
 
     @_('columns LBRACK modifiers RBRACK')
     def cell(self, p):
@@ -137,6 +166,10 @@ class HeaderParser(Parser):
     def column(self, p):
         table, column = self.table_stack.pop()
 
+        if table is None:
+            #     this may happen for extension relations, we need to resolve foreign table and column we have parsed the modifiers
+            return {'name': p.ID, 'foreign-key': {'attributes': p.columns}}
+
         return {'name': p.ID, 'foreign-key': {'table': table.name, 'name': column, 'attributes': p.columns}}
 
     @_('')
@@ -150,6 +183,10 @@ class HeaderParser(Parser):
     def column(self, p):
         # verify column exists
         table, _ = self.table_stack[-1]
+        if table is None:
+            # this happens for extension relations, we don't know the table until we've read the modifiers
+            return {'name': p.ID}
+
         if p.ID not in table.columns:
             # column does not exist, this is fine for [skip=true] columns
             return {'name': p.ID}
@@ -223,7 +260,9 @@ class HeaderParser(Parser):
         column = table.columns[column_name]
         # only know how to deal with a single foreign key per column
         if len(column.foreign_keys) != 1:
-            raise ValueError(f"Expected 1 foreign key, found {len(column.foreign_keys)}")
+            # this is either an error condition or an extension relation, with the foreign key in the extension table. We can tell once we have parsed the modifiers.
+            return None, column_name
+
         foreign_key = list(column.foreign_keys)[0]
         table = foreign_key.column.table
         column = foreign_key.column.name

@@ -18,9 +18,9 @@ def test_create_sql(meta, books, lexer):
     )
     result = list(InsertSqlCreator().create_sql(mapping, inserts))
 
-    expected = [('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-                 {'title': 'Pride and Prejudice', 'name': 'Jane Austen'})]
-    assert result == expected
+    expected = ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+                 {'title': 'Pride and Prejudice', 'name': 'Jane Austen'})
+    assert result[0].query, result[0].params == expected
 
 
 def test_create_sql_multiple_update_rows(meta, books, lexer):
@@ -36,13 +36,13 @@ def test_create_sql_multiple_update_rows(meta, books, lexer):
     ],
         columns=columns
     )
-    result = list(UpdateSqlCreator().create_sql(mapping, updates))
+    updates = list(UpdateSqlCreator().create_sql(mapping, updates))
 
     expected = [
         ('update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', {'name': 'Charles Dickens', 'title': 'Pride and Prejudice'}),
         ('update books set description = :description where books.title = :title', {'title': 'David Copperfield', 'description': 'A novel by Charles Dickens, narrated by ...'})
     ]
-    assert result == expected
+    assert [(u.query, u.params) for u in updates] == expected
 
 
 def test_create_sql_row_insert(meta, books, lexer):

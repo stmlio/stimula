@@ -17,12 +17,12 @@ class ParametersCompiler:
         return columns
 
     def _column(self, column):
-        return self._attributes(column['attributes'])
+        return self._attributes(column['attributes'], True)
 
-    def _attributes(self, attributes):
-        return chain(*[self._attribute(a) for a in attributes])
+    def _attributes(self, attributes, is_root_table=False):
+        return chain(*[self._attribute(a, is_root_table) for a in attributes])
 
-    def _attribute(self, attribute):
+    def _attribute(self, attribute, is_root_table):
         if 'foreign-key' in attribute:
             foreign_key = attribute['foreign-key']
             return self._attributes(foreign_key['attributes'])

@@ -4,6 +4,7 @@ This class generates insert statements based on a mapping.
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
+from itertools import chain
 
 
 class InsertCompiler:
@@ -15,7 +16,8 @@ class InsertCompiler:
         select :1, c.c0, b.b0, b1.b0
         from c, b, b as b0
         join a on b0.b2=a.a0
-        where c.c1 = :2 and b.b1 = :3 and a.a1=:4;
+        where c.c1 = :2 and b.b1 = :3 and a.a1=:4
+        returning id;
     """
 
     def compile(self, mapping):
@@ -23,11 +25,13 @@ class InsertCompiler:
         select_clause = SelectClauseCompiler().compile(mapping)
         from_clause = FromClauseCompiler().compile(mapping)
         where_clause = ForeignWhereClauseCompiler().compile(mapping)
+        returning_clause = ReturningClauseCompiler().compile(mapping)
 
-        result = f'{insert_clause}{select_clause}{from_clause}'
+        # this where clause is also used in update query. Here we need 'where'
         if where_clause:
-            result += ' where ' + where_clause
-        return result
+            where_clause = ' where ' + where_clause
+
+        return f'{insert_clause}{select_clause}{from_clause}{where_clause}{returning_clause}'
 
 
 class InsertClauseCompiler:
@@ -35,8 +39,11 @@ class InsertClauseCompiler:
         # table name is first argument
         table = mapping['table']
 
-        # comma separate columns
-        columns = ', '.join([self._column(c) for c in mapping['columns']])
+        # get lists of lists of attributes
+        column_lists = [self._column(c) for c in mapping['columns']]
+
+        # flatten list of lists and comma separate
+        columns = ', '.join([a for attributes in column_lists for a in attributes])
 
         return f'insert into {table}({columns})'
 
@@ -45,7 +52,8 @@ class InsertClauseCompiler:
         return attributes
 
     def _attributes(self, attributes):
-        return ', '.join([a['name'] for a in attributes])
+        # skip extensions on base table, because they are not columns. We'll insert them in a separate query
+        return [a['name'] for a in attributes if not a.get('foreign-key', {}).get('extension')]
 
 
 class SelectClauseCompiler:
@@ -62,8 +70,9 @@ class SelectClauseCompiler:
         return attributes
 
     def _attributes(self, attributes):
-        # iterate attributes to get list of lists
-        return [self._attribute(a) for a in attributes]
+        # iterate attributes to get list of lists.
+        # skip extensions on base table, because they are not columns. We'll insert them in a separate query
+        return [self._attribute(a) for a in attributes if not a.get('foreign-key', {}).get('extension')]
 
     def _attribute(self, attribute):
         if 'foreign-key' in attribute:
@@ -107,6 +116,10 @@ class FromClauseCompiler:
         if not 'foreign-key' in attribute:
             return None
 
+        # if foreign key is an extension on the root table, then we must not join
+        if is_root_table and attribute['foreign-key'].get('extension'):
+            return None
+
         from_clause = ''
 
         # if not root, then assume we need a left join. This may require a modifier at some point.
@@ -128,6 +141,13 @@ class FromClauseCompiler:
         # if not root then add on clause
         if not is_root_table:
             from_clause += f' on {source_alias}.{attribute["name"]} = {target_alias}.{foreign_key["name"]}'
+
+            # if this is an Odoo style extension relation and it's not on the root table, then we need to filter by qualifier (module) and table (model)
+            if foreign_key.get('extension'):
+                qualifier = foreign_key['qualifier']
+                # assume for now that source alias is the table name. This is fine as long as we're not joining the same table multiple times
+                table_name = source_alias
+                from_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{qualifier}\''
 
         # recurse
         return from_clause + self._attributes(foreign_key['attributes'], target_alias, False)
@@ -169,5 +189,30 @@ class ForeignWhereClauseCompiler:
         target_name = foreign_key['table']
         target_alias = foreign_key.get('alias', target_name)
 
+        # skip if this is an extension on the root table
+        if is_root_table and foreign_key.get('extension'):
+            return ''
+
         # recurse
-        return ' and '.join(self._attributes(foreign_key['attributes'], target_alias, False))
+        where_clause = ' and '.join(self._attributes(foreign_key['attributes'], target_alias, False))
+
+        return where_clause
+
+
+class ReturningClauseCompiler:
+    # returns 'returning id' if this mapping contains an extension relation on the root table
+
+    def compile(self, mapping):
+        clauses = chain(*[self._column(c) for c in mapping['columns']])
+        if not any([c for c in clauses if c]):
+            return ''
+        return ' returning id'
+
+    def _column(self, column):
+        return self._attributes(column.get('attributes', []))
+
+    def _attributes(self, attributes):
+        return [self._attribute(attribute) for attribute in attributes]
+
+    def _attribute(self, attribute):
+        return 'foreign-key' in attribute and attribute['foreign-key'].get('extension', False)

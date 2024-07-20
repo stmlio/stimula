@@ -39,7 +39,8 @@ class HeaderCompiler:
         # return list of non-unique columns
         if 'columns' not in mapping:
             return []
-        columns = [self._column(c) for c in mapping['columns'] if not c.get('unique', False)]
+        # remove unique columns, also remove 'skip' columns because we don't want to write them to DB
+        columns = [self._column(c) for c in mapping['columns'] if not c.get('unique', False) and not c.get('skip', False)]
         # remove empty columns
         return [c for c in columns if c]
 

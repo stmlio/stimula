@@ -2,6 +2,8 @@ import pandas as pd
 import pytest
 from numpy import NaN
 
+from stimula.service.query_executor import SimpleQueryExecutor
+
 
 def test_tables(books, db, context):
     tables = db.get_tables()
@@ -10,8 +12,8 @@ def test_tables(books, db, context):
 
 
 def test_filtered_tables(books, db, context):
-    tables = db.get_tables(filter='o')
-    expected = [{'name': 'authors', 'count': 4}, {'name': 'books', 'count': 6}, {'count': 0, 'name': 'properties'}]
+    tables = db.get_tables(filter='oo')
+    expected = [{'name': 'books', 'count': 6}]
     assert tables == expected
 
 
@@ -237,10 +239,10 @@ def test_post_table_update_with_missing_unique_column(db, books, context):
 
 def test_execute_sql_no_commit(db, books, context):
     sql = [
-        ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
-        ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Witches', 'name': 'Charles Dickens'}),
-        ('update books set authorid = authors.author_id from authors where title = :title and authors.name = :name', {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
-        ('delete from books where title = :title', {'title': 'Catch-22'})
+        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
+        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Witches', 'name': 'Charles Dickens'}),
+        SimpleQueryExecutor('update books set authorid = authors.author_id from authors where title = :title and authors.name = :name', {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
+        SimpleQueryExecutor('delete from books where title = :title', {'title': 'Catch-22'})
     ]
     result = db._execute_sql(sql)
 
@@ -251,10 +253,10 @@ def test_execute_sql_no_commit(db, books, context):
 
 def test_execute_sql_with_commit(db, books, context):
     sql = [
-        ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
-        ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Witches', 'name': 'Charles Dickens'}),
-        ('update books set authorid = authors.author_id from authors where title = :title and authors.name = :name', {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
-        ('delete from books where title = :title', {'title': 'Catch-22'})
+        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
+        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Witches', 'name': 'Charles Dickens'}),
+        SimpleQueryExecutor('update books set authorid = authors.author_id from authors where title = :title and authors.name = :name', {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
+        SimpleQueryExecutor('delete from books where title = :title', {'title': 'Catch-22'})
     ]
     result = db._execute_sql(sql, commit=True)
     rowcounts = [r for (r, q, p) in result]

@@ -138,6 +138,13 @@ class JoinClauseCompiler:
                 join_clause += f' as {target_alias}'
             join_clause += f' on {alias}.{source_name} = {target_alias}.{target_name}'
 
+            # if this is an Odoo style extension relation, then we need to filter by qualifier (module) and table (model)
+            if 'qualifier' in foreign_key:
+                qualifier = foreign_key['qualifier']
+                # assume for now that alias is the table name. This is fine as long as we're not joining the same table multiple times
+                table_name = alias
+                join_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{qualifier}\''
+
             attributes = foreign_key['attributes']
             return join_clause + self._attributes(attributes, target_alias)
 

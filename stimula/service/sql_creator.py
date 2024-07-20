@@ -25,10 +25,11 @@ import pandas as pd
 from numpy import int64
 from psycopg2._json import Json
 
+from .query_executor import SimpleQueryExecutor, DependentQueryExecutor
 from ..compiler.alias_compiler import AliasCompiler
 from ..compiler.delete_compiler import DeleteCompiler
 from ..compiler.header_compiler import HeaderCompiler
-from ..compiler.insert_compiler import InsertCompiler
+from ..compiler.insert_compiler import InsertCompiler, ReturningClauseCompiler
 from ..compiler.parameters_compiler import ParametersCompiler
 from ..compiler.update_compiler import UpdateCompiler
 from ..header.values_parser import ValuesLexer, ValuesParser
@@ -52,7 +53,7 @@ class SqlCreator:
             query, value_dict = self._create_sql_row(aliased_mapping, row)
 
             # yield query and split columns
-            yield query, value_dict
+            yield SimpleQueryExecutor(query, value_dict)
 
     def _create_sql_row(self, mapping, row):
         # Create a dictionary with unique column headers as keys and values as values. We'll need these for all query types.
@@ -187,6 +188,22 @@ class SqlCreator:
 
 
 class InsertSqlCreator(SqlCreator):
+
+    def create_sql(self, mapping, diffs):
+        for query_executor in super().create_sql(mapping, diffs):
+
+            # is there an extension on the root table?
+            if not ReturningClauseCompiler().compile(mapping):
+                yield query_executor
+
+            else:
+
+                # create a separate query for the extension
+                dependent_query = self._create_extension_insert_query(mapping, query_executor.params)
+                dependent_query_executor = DependentQueryExecutor((query_executor.query, query_executor.params), dependent_query)
+                yield dependent_query_executor
+
+
     def _create_non_unique_value_dict(self, mapping, row):
         # call super to get all other columns and values
         non_unique_value_dict = super()._create_non_unique_value_dict(mapping, row)
@@ -202,6 +219,25 @@ class InsertSqlCreator(SqlCreator):
     def _create_query(self, mapping, value_dict):
         # create insert query
         return InsertCompiler().compile(mapping)
+
+    def _create_extension_insert_query(self, mapping, param):
+        # get extension foreign keys
+        extension_foreign_keys = [a['foreign-key'] for c in mapping['columns'] for a in c.get('attributes', []) if a.get('foreign-key', {}).get('extension')]
+
+        # only one extension is supported for now
+        assert len(extension_foreign_keys) == 1, f'Only one extension is supported, found: {len(extension_foreign_keys)}'
+
+        foreign_key = extension_foreign_keys[0]
+        table = foreign_key['table']
+        name = param['name']
+        qualifier = foreign_key['qualifier']
+        # TODO: replace with proper way to get the model name
+        model = mapping['table'].replace('_', '.')
+        # create query
+
+        sql = f'insert into {table} (name, module, model, res_id) values (:name, :module, :model, :res_id)'
+        values = {'name': name, 'module': qualifier, 'model': model, 'res_id': None}
+        return sql, values
 
 
 class UpdateSqlCreator(SqlCreator):

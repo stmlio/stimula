@@ -162,7 +162,7 @@ class DB:
             # execute sql statements
             sqls = self._execute_sql(sorted_queries, commit)
         else:
-            sqls = [(None, query, params) for (query, params) in sorted_queries]
+            sqls = [(None, qe.query, qe.params) for qe in sorted_queries]
 
         # convert sql to dataframe
         return self._convert_to_df(sqls, execute)
@@ -445,22 +445,18 @@ class DB:
         sorted_queries = list(deletes) + list(inserts) + list(updates)
         return sorted_queries
 
-    def _execute_sql(self, queries, commit=False):
+    def _execute_sql(self, query_executors, commit=False):
         # get cursor from context
         cr = cnx_context.cr
 
         result = []
 
-        # iterate queries
-        for query, params in queries:
-            # replace ':' style place holders with '%' style
-            psycopg_query = self._replace_placeholders(query)
-            # replace NA values with None in params dictionary
-            params_with_none = {k: None if pd.isna(v) else v for k, v in params.items()}
-            # execute query
-            cr.execute(psycopg_query, params_with_none)
-            # Get the number of affected rows
-            result.append((cr.rowcount, query, params))
+        # iterate query executors
+        for query_executor in query_executors:
+            # delegate execution to query executor
+            execute_result = query_executor.execute(cr)
+            # append result to list
+            result.append(execute_result)
 
         # commit if requested
         if commit:
@@ -473,9 +469,6 @@ class DB:
 
         return result
 
-    def _replace_placeholders(self, query):
-        # replace :xyz with %(xyz)s using regex
-        return re.sub(r':(\w+)', r'%(\1)s', query)
 
     def set_context(self, url, password):
         # create psycopg2 connection

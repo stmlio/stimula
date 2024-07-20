@@ -44,7 +44,7 @@ def test_columns_not_found_with_skip(books, lexer, meta):
 def test_modifiers(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], price[x=1: y=2]'
-    result =HeaderParser(meta, table).parse_csv(header)
+    result = HeaderParser(meta, table).parse_csv(header)
     expected = {'table': 'books', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'x': '1', 'y': '2', 'enabled': True}
@@ -137,5 +137,37 @@ def test_escaped_strings(books, lexer, meta):
         {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'default-value': '10', 'enabled': True},
         {'attributes': [{'name': 'description', 'type': 'text'}], 'default-value': 'this, is a book', 'enabled': True}
+    ], }
+    assert result == expected
+
+
+def test_extension_header(books, meta, ir_model_data):
+    table = 'books'
+    header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
+    result = HeaderParser(meta, table).parse_csv(header)
+    expected = {'table': 'books', 'columns': [
+        {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
+        {'attributes': [
+            {'name': 'bookid', 'foreign-key': {'extension': True, 'table': 'ir_model_data', 'name': 'res_id', 'qualifier': 'netsuite_books', 'attributes': [
+                {'name': 'name', 'type': 'varchar'},
+            ]}}
+        ], 'enabled': True}
+    ], }
+    assert result == expected
+
+
+def test_extension_in_foreign_table(books, meta, ir_model_data):
+    table = 'books'
+    header = 'title[unique=true], authorid(author_id(name))[table=ir_model_data: name=res_id: qualifier=netsuite_authors]'
+    result = HeaderParser(meta, table).parse_csv(header)
+    expected = {'table': 'books', 'columns': [
+        {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
+        {'attributes': [
+            {'name': 'authorid', 'foreign-key': {'table': 'authors', 'name': 'author_id', 'attributes': [
+                {'name': 'author_id', 'foreign-key': {'extension': True, 'table': 'ir_model_data', 'name': 'res_id', 'qualifier': 'netsuite_authors', 'attributes': [
+                    {'name': 'name', 'type': 'varchar'},
+                ]}}
+            ]}}
+        ], 'enabled': True}
     ], }
     assert result == expected
