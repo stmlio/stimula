@@ -79,6 +79,7 @@ def test_extension(books, meta, context, ir_model_data):
     expected = "insert into books(title) select :title returning id"
     assert result == expected
 
+
 def test_extension_in_foreign_table(books, meta, context, ir_model_data):
     # extension on secondary table, must join extension table to find foreign key value
     table = 'books'

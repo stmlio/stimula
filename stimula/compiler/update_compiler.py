@@ -20,9 +20,9 @@ class UpdateCompiler:
     def compile(self, mapping):
         aliased_mapping = AliasCompiler().compile(mapping)
         update_clause = UpdateClauseCompiler().compile(aliased_mapping)
-        from_clause = FromClauseCompiler().compile(aliased_mapping)
+        from_clause = FromClauseCompiler(False).compile(aliased_mapping)
         where_clause = WhereClauseCompiler().compile(aliased_mapping)
-        foreign_where_clause = ForeignWhereClauseCompiler().compile(aliased_mapping)
+        foreign_where_clause = ForeignWhereClauseCompiler(False).compile(aliased_mapping)
 
         result = f'{update_clause}{from_clause}{where_clause}'
         if foreign_where_clause:
@@ -87,9 +87,14 @@ class WhereClauseCompiler:
         return [self._attribute(attribute, table_name) for attribute in column['attributes']]
 
     def _attribute(self, attribute, alias):
-        # this compiler is only for the base table, don't recurse foreign keys
-        if 'foreign-key' in attribute:
-            return ''
         column_name = attribute['name']
+        # this compiler is only for the base table, don't recurse foreign keys
+
+        if 'foreign-key' in attribute:
+            # restrict the foreign key to the base table
+            foreign_key = attribute['foreign-key']
+            return f'{alias}.{column_name} = {foreign_key["alias"]}.{foreign_key["name"]}'
+
+        # if no foreign key, restrict base table to value from parameter
         parameter_name = attribute.get('parameter', f'{column_name}')
         return f'{alias}.{column_name} = :{parameter_name}'

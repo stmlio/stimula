@@ -23,8 +23,8 @@ class InsertCompiler:
     def compile(self, mapping):
         insert_clause = InsertClauseCompiler().compile(mapping)
         select_clause = SelectClauseCompiler().compile(mapping)
-        from_clause = FromClauseCompiler().compile(mapping)
-        where_clause = ForeignWhereClauseCompiler().compile(mapping)
+        from_clause = FromClauseCompiler(True).compile(mapping)
+        where_clause = ForeignWhereClauseCompiler(True).compile(mapping)
         returning_clause = ReturningClauseCompiler().compile(mapping)
 
         # this where clause is also used in update query. Here we need 'where'
@@ -88,7 +88,17 @@ class SelectClauseCompiler:
         return f':{attribute["parameter"]}'
 
 
+'''
+There's a subtle difference in the from clause between insert and update statements with respect to extensions:
+insert query: we must not join with extension table, because we're inserting a new record and we don't have a primary key yet.
+update query: we must join with extension table, because we're updating an existing record and we need to filter by the extension table.
+'''
 class FromClauseCompiler:
+
+    def __init__(self, is_insert_query):
+        # if this is an insert query, we must not join with extension tables
+        self._is_insert_query = is_insert_query
+
     def compile(self, mapping):
         # get table
         table = mapping['table']
@@ -116,8 +126,8 @@ class FromClauseCompiler:
         if not 'foreign-key' in attribute:
             return None
 
-        # if foreign key is an extension on the root table, then we must not join
-        if is_root_table and attribute['foreign-key'].get('extension'):
+        # if foreign key is an extension on the root table, then we must not join if it's an insert query
+        if is_root_table and attribute['foreign-key'].get('extension') and self._is_insert_query:
             return None
 
         from_clause = ''
@@ -146,7 +156,7 @@ class FromClauseCompiler:
             if foreign_key.get('extension'):
                 qualifier = foreign_key['qualifier']
                 # assume for now that source alias is the table name. This is fine as long as we're not joining the same table multiple times
-                table_name = source_alias
+                table_name = source_alias.replace('_', '.')
                 from_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{qualifier}\''
 
         # recurse
@@ -155,7 +165,9 @@ class FromClauseCompiler:
 
 class ForeignWhereClauseCompiler:
 
-    def __init__(self):
+    def __init__(self, is_insert_query):
+        # if this is an insert query, we must not join with extension tables
+        self._is_insert_query = is_insert_query
         self._aliases = {}
 
     def compile(self, mapping):
@@ -163,38 +175,41 @@ class ForeignWhereClauseCompiler:
         table_name = mapping['table']
         clauses = [self._column(c, table_name) for c in mapping['columns']]
 
-        # filter and flatten
-        filtered_clauses = [clause for cell in clauses for clause in cell if clause]
-        if not filtered_clauses:
-            return ''
-        return ' and '.join(filtered_clauses)
+        return ' and '.join(chain(*clauses))
 
     def _column(self, column, table):
-        where_clause_columns = self._attributes(column['attributes'], table, True)
-        return [c for c in where_clause_columns if c]
+        return self._attributes(column['attributes'], table, True)
 
     def _attributes(self, attributes, source_alias, is_root):
-        return [self._attribute(attribute, source_alias, is_root) for attribute in attributes]
+        return chain(*[self._attribute(attribute, source_alias, is_root) for attribute in attributes])
 
     def _attribute(self, attribute, alias, is_root_table):
         if not 'foreign-key' in attribute:
 
             # only add where clauses for joined tables, but do register for alias
             if is_root_table:
-                return ''
+                return []
             parameter_name = attribute.get('parameter', f'{attribute["name"]}')
-            return f'{alias}.{attribute["name"]} = :{parameter_name}'
+            return [f'{alias}.{attribute["name"]} = :{parameter_name}']
 
         foreign_key = attribute['foreign-key']
         target_name = foreign_key['table']
         target_alias = foreign_key.get('alias', target_name)
 
-        # skip if this is an extension on the root table
-        if is_root_table and foreign_key.get('extension'):
-            return ''
+        # don't add extension conditions if this is an insert query
+        if is_root_table and foreign_key.get('extension') and self._is_insert_query:
+            return []
 
         # recurse
-        where_clause = ' and '.join(self._attributes(foreign_key['attributes'], target_alias, False))
+        where_clause = self._attributes(foreign_key['attributes'], target_alias, False)
+
+        # add extension conditions if this is the root of an update query
+        if is_root_table and foreign_key.get('extension') and not self._is_insert_query:
+            # assume for now that the alias is the table name. This is fine as long as we're not joining the same table multiple times
+            model = alias.replace('_', '.')
+            extension_clause = [f"{target_alias}.module = '{foreign_key['qualifier']}'",
+                                f"{target_alias}.model = '{model}'"]
+            where_clause = chain(where_clause, extension_clause)
 
         return where_clause
 

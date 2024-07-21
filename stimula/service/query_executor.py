@@ -14,6 +14,10 @@ class QueryExecutor(ABC):
     def execute(self, cursor):
         pass
 
+    @abstractmethod
+    def queries(self):
+        pass
+
     def _replace_placeholders(self, query):
         # replace :xyz with %(xyz)s using regex
         return re.sub(r':(\w+)', r'%(\1)s', query)
@@ -23,6 +27,9 @@ class SimpleQueryExecutor(QueryExecutor):
     def __init__(self, query, params):
         self.query = query
         self.params = params
+
+    def queries(self):
+        return [(self.query, self.params)]
 
     def execute(self, cursor):
         # replace ':' style place holders with '%' style
@@ -41,6 +48,9 @@ class DependentQueryExecutor(QueryExecutor):
         self.query = initial_query[0]
         self.params = initial_query[1]
         self.dependent_query = dependent_query
+
+    def queries(self):
+        return [(self.query, self.params), self.dependent_query]
 
     def execute(self, cursor):
         # replace ':' style place holders with '%' style

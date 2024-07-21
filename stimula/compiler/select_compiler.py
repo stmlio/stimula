@@ -142,7 +142,7 @@ class JoinClauseCompiler:
             if 'qualifier' in foreign_key:
                 qualifier = foreign_key['qualifier']
                 # assume for now that alias is the table name. This is fine as long as we're not joining the same table multiple times
-                table_name = alias
+                table_name = alias.replace('_', '.')
                 join_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{qualifier}\''
 
             attributes = foreign_key['attributes']
