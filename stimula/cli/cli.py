@@ -10,7 +10,7 @@ Usage:
 python cli.py <command> [options]
 
 Commands:
-- auth: Authenticate and retrieve a token.
+- auth: Authenticate, retrieve a token and store it in a local file.
 - list: List tables and their record counts.
 - mapping: Retrieve mapping for a specified filter.
 - count: Count records in a table based on specified criteria.
@@ -40,6 +40,29 @@ import argparse
 from stimula.cli import local, remote
 
 
+def _read_token_from_file(args):
+    # try to read token from local file if not provided in arguments
+    if not args.token:
+        try:
+            with open('.stimula_token', 'r') as file:
+                args.token = file.read()
+        except FileNotFoundError:
+            pass
+
+
+def _write_token_to_file(token):
+    # write token to local file
+    with open('.stimula_token', 'w') as file:
+        file.write(token)
+
+
+def _read_mapping_from_file(args):
+    # check if mapping is provided as file name, then use the first line
+    if args.mapping and args.mapping.endswith('.csv'):
+        with open(args.mapping, 'r') as file:
+            args.mapping = file.readline().strip()
+
+
 def main():
     parser = argparse.ArgumentParser(description='Stimula CLI')
     parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post'])
@@ -67,12 +90,21 @@ def main():
         # otherwise, use local invoker
         invoker = local.Invoker(args.key, args.host, args.port)
 
-    # authenticate if needed
+    # try to read token from local file
+    _read_token_from_file(args)
+
+    # if auth request or no token provide
     if args.command == 'auth' or not args.token:
+        # authenticate and set token
         args.token = invoker.auth(args.database, args.user, args.password)
+        #     # write token to local file
+        _write_token_to_file(args.token)
 
     # validate token and set connection context
     invoker.set_context(args.token)
+
+    # check if mapping is provided as file name, then use the first line
+    _read_mapping_from_file(args)
 
     # execute command
     if args.command == 'auth':
