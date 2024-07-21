@@ -4,7 +4,7 @@ This class provides the main database service to list tables, create mappings, r
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
-
+import io
 import logging
 import re
 from io import StringIO
@@ -257,10 +257,13 @@ class DB:
         # get dtypes for read_csv
         dtype = column_types.get('read_csv_dtypes', {})
 
+        # read body as csv and pad with empty columns if needed
+        stringio = self._read_and_pad_csv(body, len(non_empty_column_names))
+
         # read csv from request body
         # treat '' as missing value, but treat NA as string
         df = pd.read_csv(
-            StringIO(body),
+            stringio,
             names=non_empty_column_names,
             index_col=index_columns,
             skipinitialspace=True,
@@ -533,3 +536,28 @@ class DB:
         result_columns.extend(unselected_columns)
 
         return result_columns
+
+    def _read_and_pad_csv(self, body, expected_column_count):
+        # read file as is, because we may need to pad it
+        df_initial = pd.read_csv(StringIO(body), header=None)
+
+        # Extend DataFrame to match the expected number of columns
+        if len(df_initial.columns) < expected_column_count:
+            # pad the DataFrame with empty columns
+            _logger.info(f"Padding DataFrame with {expected_column_count - len(df_initial.columns)} empty columns")
+            df_extended = df_initial.reindex(columns=range(expected_column_count))
+
+        elif len(df_initial.columns) > expected_column_count:
+            # truncate the DataFrame to the expected number of columns
+            _logger.info(f"Truncating DataFrame to {expected_column_count} columns")
+            df_extended = df_initial.iloc[:, :expected_column_count]
+        else:
+            # no padding or truncation needed
+            df_extended = df_initial
+
+        # Write the extended DataFrame to an in-memory StringIO object
+        output = io.StringIO()
+        df_extended.to_csv(output, index=False, header=False)
+        output.seek(0)
+
+        return output
