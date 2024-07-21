@@ -298,8 +298,9 @@ class DB:
         # store original column names so we can restore them later
         original_column_names = df.columns
 
-        # remove modifiers in column names so we can use the bare names in expressions
+        # remove foreign keys and modifiers in column names so we can use the bare names in expressions
         df.columns = df.columns.str.replace(r'\[.*\]', '', regex=True)
+        df.columns = df.columns.str.replace(r'\(.*\)', '', regex=True)
 
         # now that we have all data, we can evaluate column expressions.
         for column in mapping['columns']:
