@@ -4,7 +4,6 @@ This class provides the main database service to list tables, create mappings, r
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
-import io
 import logging
 import re
 from io import StringIO
@@ -13,8 +12,6 @@ import pandas as pd
 import psycopg2
 from pandas import DataFrame
 
-from .context import cnx_context, get_metadata
-from .diff_to_sql import DiffToSql
 from stimula.compiler.header_compiler import HeaderCompiler
 from stimula.compiler.select_compiler import SelectCompiler
 from stimula.compiler.types_compiler import TypesCompiler
@@ -22,6 +19,8 @@ from stimula.header.csv_header_parser import HeaderParser
 from stimula.header.header_lexer import HeaderLexer
 from stimula.header.header_merger import HeaderMerger
 from stimula.header.odoo_header_parser import OdooHeaderParser
+from .context import cnx_context, get_metadata
+from .diff_to_sql import DiffToSql
 
 _logger = logging.getLogger(__name__)
 
@@ -248,6 +247,9 @@ class DB:
         if duplicate_column_names:
             raise ValueError(f"Duplicate column names are not supported: {', '.join(duplicate_column_names)}")
 
+        # get list of columns to use in the output dataframe
+        use_columns = [c for c in non_empty_column_names if c in column_names]
+
         # list names of columns with datetime64 or date type, because we need to parse them as datetime
         parse_dates = column_types.get('read_csv_parse_dates', {})
 
@@ -257,30 +259,37 @@ class DB:
         # get dtypes for read_csv
         dtype = column_types.get('read_csv_dtypes', {})
 
-        # read body as csv and pad with empty columns if needed
-        stringio = self._read_and_pad_csv(body, len(non_empty_column_names))
+        # read body as csv to count the number of columns in the body
+        # there may a more efficient way without having to read the csv twice.
+        body_column_count = self._count_body_columns(body)
+
+        # create initial column names to read the csv before padding
+        initial_names = non_empty_column_names[:body_column_count]
+        initial_usecols = [c for c in use_columns if c in non_empty_column_names[:body_column_count]]
 
         # read csv from request body
         # treat '' as missing value, but treat NA as string
         df = pd.read_csv(
-            stringio,
-            names=non_empty_column_names,
+            StringIO(body),
+            names=initial_names,
             index_col=index_columns,
             skipinitialspace=True,
             skiprows=skiprows,
             dtype=dtype,
             # skip the empty column names that we renamed to skip, skip1, etc
-            usecols=lambda name: name in column_names,
+            usecols=initial_usecols,
             parse_dates=parse_dates,
             converters=converters,
             na_values=[''],
             keep_default_na=False
         )
 
-        # evaluate column expressions
-        self._evaluate_expressions(df, mapping)
+        df_padded = self._pad_dataframe_with_empty_columns(df, use_columns)
 
-        return df
+        # evaluate column expressions
+        self._evaluate_expressions(df_padded, mapping)
+
+        return df_padded
 
     def _evaluate_expressions(self, df, mapping):
         # a column header can contain a python expression. Evaluate these now that we've read all values from CSV.
@@ -306,7 +315,6 @@ class DB:
 
         # remove skip columns, because we've evaluated expressions so we no longer need them. Match column name with 'skip=true':
         df.drop(columns=[column for column in df.columns if 'skip=true' in column], errors='ignore', inplace=True)
-
 
     def _read_from_db(self, mapping, where_clause, set_index=False):
         # get sqlalchemy engine from context
@@ -472,7 +480,6 @@ class DB:
 
         return result
 
-
     def set_context(self, url, password):
         # create psycopg2 connection
         cnx = psycopg2.connect(url, password=password)
@@ -537,27 +544,28 @@ class DB:
 
         return result_columns
 
-    def _read_and_pad_csv(self, body, expected_column_count):
-        # read file as is, because we may need to pad it
-        df_initial = pd.read_csv(StringIO(body), header=None)
+    def _count_body_columns(self, body):
+        # skipinitialspace must be true, otherwise it may split on comma's in strings
+        df_initial = pd.read_csv(StringIO(body), skipinitialspace=True, header=None)
 
-        # Extend DataFrame to match the expected number of columns
-        if len(df_initial.columns) < expected_column_count:
-            # pad the DataFrame with empty columns
-            _logger.info(f"Padding DataFrame with {expected_column_count - len(df_initial.columns)} empty columns")
-            df_extended = df_initial.reindex(columns=range(expected_column_count))
+        # return the number of columns in the body
+        return len(df_initial.columns)
 
-        elif len(df_initial.columns) > expected_column_count:
-            # truncate the DataFrame to the expected number of columns
-            _logger.info(f"Truncating DataFrame to {expected_column_count} columns")
-            df_extended = df_initial.iloc[:, :expected_column_count]
-        else:
-            # no padding or truncation needed
-            df_extended = df_initial
+    def _pad_dataframe_with_empty_columns(self, df, column_names):
+        # get current column names
+        current_columns = df.columns.tolist()
 
-        # Write the extended DataFrame to an in-memory StringIO object
-        output = io.StringIO()
-        df_extended.to_csv(output, index=False, header=False)
-        output.seek(0)
+        # get number of columns to pad, take columns and indices into account
+        pad_count = len(column_names) - df.shape[1] - df.index.nlevels
 
-        return output
+        # if there are too few columns
+        if pad_count <= 0:
+            # nothing to pad
+            return df
+
+        # pad the DataFrame with empty columns
+        _logger.info(f"Padding DataFrame with {pad_count} empty columns")
+        current_columns += column_names[-pad_count:]
+
+        # be careful not to set index columns, the columns attribute must only be set to non-index column names
+        return df.reindex(columns=current_columns, fill_value='')

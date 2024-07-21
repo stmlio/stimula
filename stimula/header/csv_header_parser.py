@@ -139,8 +139,8 @@ class HeaderParser(Parser):
                     for a in foreign_key.get('attributes', []):
                         if a['name'] not in table.columns:
                             raise ValueError(f"Column '{a['name']}' not found in table '{table}'")
-                        type = str(table.columns[a['name']].type).lower()
-                        a['type'] = type
+                        column_type = str(table.columns[a['name']].type).lower()
+                        a['type'] = column_type
 
     @_('columns LBRACK modifiers RBRACK')
     def cell(self, p):

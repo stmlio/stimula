@@ -341,3 +341,14 @@ def test_get_count_with_where_clause(db, books, context):
 def test_get_count_with_error(db, books, context):
     with pytest.raises(Exception, match='column "abc" does not exist.*'):
         db.get_count('books', None, 'authorid = abc')
+
+def test_post_table_padding(db, books):
+    # test that it can pad with empty columns if needed
+    body = '''
+        Pride and Prejudice, Jane Austen
+    '''
+    create, update, delete = db.post_table_get_diff('books', 'title[unique=true], authorid(name), description', None, body, insert=True, update=True, delete=True)
+
+    expected_create = [['Pride and Prejudice', 'Jane Austen', '']]
+
+    assert create.values.tolist() == expected_create
