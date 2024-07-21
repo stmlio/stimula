@@ -7,6 +7,8 @@ Email: romke@rnadesign.net
 import re
 from itertools import chain
 
+from stimula.compiler.select_compiler import SelectCompiler
+
 
 class InsertCompiler:
     """
@@ -157,20 +159,13 @@ class FromClauseCompiler:
             if foreign_key.get('extension'):
                 qualifier = foreign_key['qualifier']
                 # assume for now that source alias is the table name. This is fine as long as we're not joining the same table multiple times
-                table_name = self._get_model_name(source_alias)
+                table_name = SelectCompiler().get_model_name(source_alias)
                 from_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{qualifier}\''
+
 
         # recurse
         return from_clause + self._attributes(foreign_key['attributes'], target_alias, False)
 
-    def _get_model_name(self, alias):
-        # this method gets the model name to use in the extension clause
-        # current solution is based on the alias, which is not very robust
-        # alias is of the form 'xxx_xxx_xxx_d', we need to convert that into 'xxx.xxx.xxx'
-
-        # remove '_0' postfix from alias using regex if it exists
-        alias = re.sub(r'_\d+$', '', alias)
-        return alias.replace('_', '.')
 
 
 class ForeignWhereClauseCompiler:

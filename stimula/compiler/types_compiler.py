@@ -15,6 +15,7 @@ import json
 import re
 
 import pandas as pd
+from numpy import isnan
 
 
 class TypesCompiler:
@@ -249,8 +250,10 @@ def date_to_datetime_converter(date):
 # Custom converter function to set default values when reading CSV
 def default_value_converter(dtype, default):
     # pandas ignores dtype if a converter is set, so we need to convert the value to the correct type
-    return lambda value: _convert_to_dtype(dtype, value if value is not None and value != '' else default)
+    return lambda value: _convert_to_dtype(dtype, _set_default_value(value, default))
 
+def _set_default_value(value, default):
+    return value if value is not None and value != '' and not isnan(value) else default
 
 def _convert_to_dtype(dtype, value):
     if dtype == 'boolean':

@@ -4,6 +4,8 @@ This class compiles a mapping into a select query.
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
+import re
+
 from .alias_compiler import AliasCompiler
 
 
@@ -42,6 +44,16 @@ class SelectCompiler:
         join_clause = JoinClauseCompiler().compile(aliased_mapping)
         where = f' where {where_clause}' if where_clause else ''
         return f'{select_clause} from {table}{join_clause}{where}'
+
+    def get_model_name(self, alias):
+        # this method gets the model name to use in the extension clause
+        # current solution is based on the alias, which is not very robust
+        # alias is of the form 'xxx_xxx_xxx_d', we need to convert that into 'xxx.xxx.xxx'
+
+        # remove '_0' postfix from alias using regex if it exists
+        alias = re.sub(r'_\d+$', '', alias)
+        return alias.replace('_', '.')
+
 
 
 class SelectClauseCompiler:
@@ -142,7 +154,7 @@ class JoinClauseCompiler:
             if 'qualifier' in foreign_key:
                 qualifier = foreign_key['qualifier']
                 # assume for now that alias is the table name. This is fine as long as we're not joining the same table multiple times
-                table_name = alias.replace('_', '.')
+                table_name = SelectCompiler().get_model_name(alias)
                 join_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{qualifier}\''
 
             attributes = foreign_key['attributes']
