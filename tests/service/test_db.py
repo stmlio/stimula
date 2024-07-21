@@ -354,3 +354,24 @@ def test_post_table_padding(db, books):
     # check nan values separately, bec you can't compare them
     assert create.values.tolist()[0][:2] == expected_create[:2]
     assert isnan(create.values.tolist()[0][2])
+
+
+def test_post_table_padding_with_unique_default(db, books):
+    # test that it can pad with a column with default value and then promote that to unique index
+    body = '''
+        Emma, Jane Austen, 24.99
+    '''
+
+    # take existing description to verify it uses it in select
+    default_description = "Emma Woodhouse is one of Austen's most captivating and vivid characters."
+
+    df = db.post_table_get_sql('books', f'title[unique=true], authorid(name), price, "description[default-value=""{default_description}"": unique=true]"', None, body, update=True)
+
+    dtypes = {'sql': 'string', 'title': 'string', 'price': 'Float64', 'description': 'string'}
+    expected = pd.DataFrame([
+        ['update books set price = :price where books.title = :title and books.description = :description', 'Emma', 24.99, default_description]
+    ],
+        columns=['sql', 'title', 'price', 'description']
+    ).astype(dtypes)
+
+    assert df.equals(expected)

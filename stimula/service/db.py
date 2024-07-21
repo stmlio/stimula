@@ -264,6 +264,7 @@ class DB:
         body_column_count = self._count_body_columns(body)
 
         # create initial column names to read the csv before padding
+        initial_index_columns = [c for c in index_columns if c in non_empty_column_names[:body_column_count]]
         initial_names = non_empty_column_names[:body_column_count]
         initial_usecols = [c for c in use_columns if c in non_empty_column_names[:body_column_count]]
 
@@ -272,7 +273,7 @@ class DB:
         df = pd.read_csv(
             StringIO(body),
             names=initial_names,
-            index_col=index_columns,
+            index_col=initial_index_columns,
             skipinitialspace=True,
             skiprows=skiprows,
             dtype=dtype,
@@ -284,7 +285,7 @@ class DB:
             keep_default_na=False
         )
 
-        df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, converters)
+        df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, index_columns, converters)
 
         # evaluate column expressions
         self._evaluate_expressions(df_padded, mapping)
@@ -551,7 +552,7 @@ class DB:
         # return the number of columns in the body
         return len(df_initial.columns)
 
-    def _pad_dataframe_with_empty_columns(self, df, column_names, converters):
+    def _pad_dataframe_with_empty_columns(self, df, column_names, index_columns, converters):
         # get current column names
         current_columns = df.columns.tolist()
 
@@ -563,16 +564,24 @@ class DB:
             # nothing to pad
             return df
 
+        # get columns to pad
+        pad_columns = column_names[-pad_count:]
+
         # pad the DataFrame with empty columns
         _logger.info(f"Padding DataFrame with {pad_count} empty columns")
-        current_columns += column_names[-pad_count:]
+        current_columns += pad_columns
 
         # be careful not to set index columns, the columns attribute must only be set to non-index column names
         df_padded = df.reindex(columns=current_columns, fill_value=None)
 
         # apply converters to padded columns
-        for column in column_names[-pad_count:]:
+        for column in pad_columns:
             if column in converters:
                 df_padded[column] = df_padded[column].apply(converters[column])
+
+        # set additional index columns
+        for column in pad_columns:
+            if column in index_columns:
+                df_padded.set_index(column, append=True, inplace=True)
 
         return df_padded
