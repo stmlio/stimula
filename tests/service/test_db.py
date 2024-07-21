@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from numpy import NaN
+from numpy import NaN, nan, isnan
 
 from stimula.service.query_executor import SimpleQueryExecutor
 
@@ -349,6 +349,8 @@ def test_post_table_padding(db, books):
     '''
     create, update, delete = db.post_table_get_diff('books', 'title[unique=true], authorid(name), description', None, body, insert=True, update=True, delete=True)
 
-    expected_create = [['Pride and Prejudice', 'Jane Austen', '']]
+    expected_create = ['Pride and Prejudice', 'Jane Austen', nan]
 
-    assert create.values.tolist() == expected_create
+    # check nan values separately, bec you can't compare them
+    assert create.values.tolist()[0][:2] == expected_create[:2]
+    assert isnan(create.values.tolist()[0][2])

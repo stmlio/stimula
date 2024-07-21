@@ -284,7 +284,7 @@ class DB:
             keep_default_na=False
         )
 
-        df_padded = self._pad_dataframe_with_empty_columns(df, use_columns)
+        df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, converters)
 
         # evaluate column expressions
         self._evaluate_expressions(df_padded, mapping)
@@ -551,7 +551,7 @@ class DB:
         # return the number of columns in the body
         return len(df_initial.columns)
 
-    def _pad_dataframe_with_empty_columns(self, df, column_names):
+    def _pad_dataframe_with_empty_columns(self, df, column_names, converters):
         # get current column names
         current_columns = df.columns.tolist()
 
@@ -568,4 +568,11 @@ class DB:
         current_columns += column_names[-pad_count:]
 
         # be careful not to set index columns, the columns attribute must only be set to non-index column names
-        return df.reindex(columns=current_columns, fill_value='')
+        df_padded = df.reindex(columns=current_columns, fill_value=None)
+
+        # apply converters to padded columns
+        for column in column_names[-pad_count:]:
+            if column in converters:
+                df_padded[column] = df_padded[column].apply(converters[column])
+
+        return df_padded
