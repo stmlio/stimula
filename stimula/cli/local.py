@@ -40,13 +40,13 @@ class Invoker:
     def get_table(self, table, header, query):
         return self._db.get_table_as_csv(table, header, query)
 
-    def post_table(self, table, header, query, contents, skiprows, insert, update, delete, execute, commit, format):
+    def post_table(self, table, header, query, contents, skiprows, insert, update, delete, execute, commit, format, deduplicate):
         if format == None or format == 'diff':
-            post_result = self._db.post_table_get_diff(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit)
+            post_result = self._db.post_table_get_diff(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate)
             return '\n\n'.join([df.to_csv(index=False) for df in post_result])
         elif format == 'sql':
             # get diff, create sql, execute if requested and return a single data frame
-            post_result = self._db.post_table_get_sql(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit)
+            post_result = self._db.post_table_get_sql(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate)
             # convert df to response body, use double quotes where needed
             return post_result.to_csv(index=False, quotechar="\"")
 

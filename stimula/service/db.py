@@ -135,9 +135,9 @@ class DB:
         # convert dataframe to csv
         return df.to_csv(index=False, escapechar=escapechar)
 
-    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
+    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False):
         # create diffs and sql
-        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete)
+        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate)
         # if execute
         if execute:
             # execute sql statements
@@ -150,9 +150,9 @@ class DB:
 
         return diffs
 
-    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
+    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False):
         # create diffs and sql
-        _, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete)
+        _, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate)
 
         # sort queries
         sorted_queries = self._sort_queries(sql)
@@ -206,7 +206,7 @@ class DB:
 
             return result
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete):
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate):
         # get cnx from context
         cnx = cnx_context.cnx
 
@@ -214,7 +214,7 @@ class DB:
         mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
 
         # read dataframe from request first, so we can give feedback on errors in the request
-        df_request = self._read_from_request(mapping, body, skiprows)
+        df_request = self._read_from_request(mapping, body, skiprows, deduplicate)
 
         # read dataframe from DB
         df_db = self._read_from_db(mapping, where_clause, set_index=True)
@@ -227,7 +227,7 @@ class DB:
 
         return diffs, sqls
 
-    def _read_from_request(self, mapping, body, skiprows):
+    def _read_from_request(self, mapping, body, skiprows, deduplicate=False):
         # get columns and unique columns.
         column_names = HeaderCompiler().compile_list(mapping, include_skip=True)
         index_columns = HeaderCompiler().compile_list_unique(mapping)
@@ -236,6 +236,15 @@ class DB:
         # assert that at least one column header is not empty
         if not [c for c in column_names if c != '']:
             raise ValueError("At least one column header must not be empty")
+
+        # read body as csv to count the number of columns in the body
+        # there may be a more efficient way without having to read the csv twice.
+        body_column_count = self._count_body_columns(body)
+
+        # pad column names with empty columns if the body has more columns than the header
+        if body_column_count > len(column_names):
+            # add empty columns to the header
+            column_names += [''] * (body_column_count - len(column_names))
 
         # replace empty column names with skip, skip1, skip2. This is because pandas requires column names to be unique
         non_empty_column_names = list(self._replace_empty_columns_with_skip(column_names))
@@ -258,10 +267,6 @@ class DB:
 
         # get dtypes for read_csv
         dtype = column_types.get('read_csv_dtypes', {})
-
-        # read body as csv to count the number of columns in the body
-        # there may a more efficient way without having to read the csv twice.
-        body_column_count = self._count_body_columns(body)
 
         # create initial column names to read the csv before padding
         initial_index_columns = [c for c in index_columns if c in non_empty_column_names[:body_column_count]]
@@ -288,12 +293,19 @@ class DB:
         df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, index_columns, converters)
 
         # evaluate column expressions
-        self._evaluate_expressions(df_padded, mapping)
+        self._evaluate_expressions(df_padded, mapping, index_columns)
+
+        # deduplicate if requested
+        if deduplicate:
+            df_padded = self._deduplicate(df_padded, index_columns)
 
         return df_padded
 
-    def _evaluate_expressions(self, df, mapping):
+    def _evaluate_expressions(self, df, mapping, index_columns):
         # a column header can contain a python expression. Evaluate these now that we've read all values from CSV.
+
+        # drop index, so that we can use index columns in expressions
+        df.reset_index(inplace=True)
 
         # store original column names so we can restore them later
         original_column_names = df.columns
@@ -314,6 +326,9 @@ class DB:
 
         # restore column names
         df.columns = original_column_names
+
+        # restore index
+        df.set_index(index_columns, inplace=True)
 
         # remove skip columns, because we've evaluated expressions so we no longer need them. Match column name with 'skip=true':
         df.drop(columns=[column for column in df.columns if 'skip=true' in column], errors='ignore', inplace=True)
@@ -586,3 +601,16 @@ class DB:
                 df_padded.set_index(column, append=True, inplace=True)
 
         return df_padded
+
+    def _deduplicate(self, df, index_columns):
+        # reset index
+        df_reset = df.reset_index()
+
+        # Remove duplicate rows based on the index column
+        df_unique = df_reset.drop_duplicates(subset=index_columns)
+
+        # Set the column back as the index
+        df_final = df_unique.set_index(index_columns)
+
+        return df_final
+

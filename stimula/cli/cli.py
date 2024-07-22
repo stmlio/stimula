@@ -33,6 +33,7 @@ Options:
 -s, --skip        Number of rows to skip (default: 1)
 -e, --enable      Enable flags (I, U, D, E, C)
 -F, --format      Response format (choices: diff, sql)
+-D, --deduplicate Deduplicate records based on primary key
 """
 
 import argparse
@@ -81,6 +82,7 @@ def main():
     parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
     parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
     parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql'])
+    parser.add_argument('-D', '--deduplicate', action='store_true', help='Deduplicate by unique key')
     args = parser.parse_args()
 
     if args.remote:
@@ -142,7 +144,8 @@ def main():
                                  delete='D' in enable,
                                  execute='E' in enable,
                                  commit='C' in enable,
-                                 format=args.format or 'diff')
+                                 format=args.format or 'diff',
+                                 deduplicate=args.deduplicate)
         print(csv)
 
 
