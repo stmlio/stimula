@@ -14,6 +14,7 @@ Email: romke@rnadesign.net
 import json
 import re
 
+import numpy as np
 import pandas as pd
 from numpy import isnan
 
@@ -253,11 +254,11 @@ def default_value_converter(dtype, default):
     return lambda value: _convert_to_dtype(dtype, _set_default_value(value, default))
 
 def _set_default_value(value, default):
-    return value if value is not None and value != '' and not isnan(value) else default
+    return value if value is not None and value != '' and not (isinstance(value, (float, np.float64)) and np.isnan(value)) else default
 
 def _convert_to_dtype(dtype, value):
     if dtype == 'boolean':
-        return value.lower() == 'true'
+        return isinstance(value, str) and value.lower() == 'true'
 
     if dtype == 'Int64':
         return int(value)
