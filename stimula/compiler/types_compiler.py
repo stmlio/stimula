@@ -90,6 +90,10 @@ class TypesCompiler:
         if 'default-value' in column:
             result['read_csv_converter'] = default_value_converter(dtype, column['default-value'])
 
+        # set converter if column has a key, use it to create a dict
+        if 'key' in column:
+            result['read_csv_converter'] = dictionary_converter(dtype, column['key'])
+
         # set the dtype, but only if there's no converter to read CSV, because pandas ignores the dtype with a warning if a converter is set
         if 'read_csv_converter' not in result:
             result['read_csv_dtype'] = dtype
@@ -253,8 +257,15 @@ def default_value_converter(dtype, default):
     # pandas ignores dtype if a converter is set, so we need to convert the value to the correct type
     return lambda value: _convert_to_dtype(dtype, _set_default_value(value, default))
 
+
 def _set_default_value(value, default):
     return value if value is not None and value != '' and not (isinstance(value, (float, np.float64)) and np.isnan(value)) else default
+
+
+def dictionary_converter(dtype, key):
+    # pandas ignores dtype if a converter is set, so we need to convert the value to the correct type
+    return lambda value: _convert_to_dtype(dtype, {key: value})
+
 
 def _convert_to_dtype(dtype, value):
     if dtype == 'boolean':
@@ -267,4 +278,3 @@ def _convert_to_dtype(dtype, value):
         return float(value)
 
     return value
-
