@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='stimula',
-    version='0.0.1',
+    version='0.0.4',
     description='Toolset library for Simple Table Mapping Language (STML)',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -15,7 +15,7 @@ setup(
         'pyjwt',
         'sqlalchemy',
         'pandas>=2.1.3',
-        'numpy',
+        'numpy>=1.22.4',
         'cryptography>=3.4.8,<4.0',
     ],
     classifiers=[

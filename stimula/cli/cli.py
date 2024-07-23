@@ -37,6 +37,7 @@ Options:
 """
 
 import argparse
+from importlib.metadata import version
 
 from stimula.cli import local, remote
 
@@ -83,6 +84,7 @@ def main():
     parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
     parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql'])
     parser.add_argument('-D', '--deduplicate', action='store_true', help='Deduplicate by unique key')
+    parser.add_argument('-v', '--version', action='version', version=version('stimula'))
     args = parser.parse_args()
 
     if args.remote:
