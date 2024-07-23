@@ -305,7 +305,8 @@ class DB:
         # a column header can contain a python expression. Evaluate these now that we've read all values from CSV.
 
         # drop index, so that we can use index columns in expressions
-        df.reset_index(inplace=True)
+        if index_columns:
+            df.reset_index(inplace=True)
 
         # store original column names so we can restore them later
         original_column_names = df.columns
@@ -328,7 +329,8 @@ class DB:
         df.columns = original_column_names
 
         # restore index
-        df.set_index(index_columns, inplace=True)
+        if index_columns:
+            df.set_index(index_columns, inplace=True)
 
         # remove skip columns, because we've evaluated expressions so we no longer need them. Match column name with 'skip=true':
         df.drop(columns=[column for column in df.columns if 'skip=true' in column], errors='ignore', inplace=True)
