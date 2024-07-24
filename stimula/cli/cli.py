@@ -34,35 +34,20 @@ Options:
 -e, --enable      Enable flags (I, U, D, E, C)
 -F, --format      Response format (choices: diff, sql)
 -D, --deduplicate Deduplicate records based on primary key
+-v, --version     Print version information
+-V, --verbose     Increase output verbosity
+-M, --transpose   Transpose the mapping
 """
 
 import argparse
+import os
+import sys
 from importlib.metadata import version
+from io import StringIO
+
+import pandas as pd
 
 from stimula.cli import local, remote
-
-
-def _read_token_from_file(args):
-    # try to read token from local file if not provided in arguments
-    if not args.token:
-        try:
-            with open('.stimula_token', 'r') as file:
-                args.token = file.read()
-        except FileNotFoundError:
-            pass
-
-
-def _write_token_to_file(token):
-    # write token to local file
-    with open('.stimula_token', 'w') as file:
-        file.write(token)
-
-
-def _read_mapping_from_file(args):
-    # check if mapping is provided as file name, then use the first line
-    if args.mapping and args.mapping.endswith('.csv'):
-        with open(args.mapping, 'r') as file:
-            args.mapping = file.readline().strip()
 
 
 def main():
@@ -82,16 +67,42 @@ def main():
     parser.add_argument('-f', '--file', help='Path to the file to post', type=argparse.FileType('r'))
     parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
     parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
-    parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql'])
+    parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql'], default='sql')
     parser.add_argument('-D', '--deduplicate', action='store_true', help='Deduplicate by unique key')
     parser.add_argument('-v', '--version', action='version', version=version('stimula'))
+    parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
+    parser.add_argument('-M', '--transpose', action='store_true', help='Transpose the mapping')
+
     args = parser.parse_args()
+
+    try:
+        execute_command(args)
+    except Exception as e:
+        if args.verbose:
+            # print message with stack trace
+            raise e
+        else:
+            # print message without stack trace
+            print(f'Error: {e}')
+
+
+def execute_command(args):
+    # if verbose, print working directory
+    if args.verbose:
+        print(f'Working directory: {os.getcwd()}')
 
     if args.remote:
         # if remote is specified, use remote invoker
         invoker = remote.Invoker(args.remote)
     else:
-        # otherwise, use local invoker
+        # otherwise, read key from environment if not provided as argument
+        if not args.key:
+            args.key = os.getenv('STIMULA_KEY')
+
+        # if key is still not provided, raise an error
+        assert args.key, 'Secret key must be provided, either as --key argument or STIMULA_KEY environment variable'
+
+        # use local invoker
         invoker = local.Invoker(args.key, args.host, args.port)
 
     # try to read token from local file
@@ -110,6 +121,14 @@ def main():
     # check if mapping is provided as file name, then use the first line
     _read_mapping_from_file(args)
 
+    if args.transpose:
+        # transpose mapping
+        _transpose_mapping(args)
+
+    # use only first line of mapping
+    if args.mapping:
+        args.mapping = args.mapping.splitlines()[0]
+
     # execute command
     if args.command == 'auth':
         print(f'Token: {args.token}')
@@ -125,27 +144,43 @@ def main():
         count = invoker.count(args.table, args.mapping, args.query)
         print(count)
     elif args.command == 'get':
+        assert args.table, 'Table name must be provided using -t or --table flag.'
         table = invoker.get_table(args.table, args.mapping, args.query)
         print(table)
     elif args.command == 'post':
-        assert args.file is not None, 'File is required for post command'
-        enable = args.enable or ''
+        assert args.table, 'Table name must be provided using -t or --table flag.'
+        assert args.enable, 'At least one of the flags I, U, D, E, or C must be enabled. Otherwise, there\'s nothing to do.'
 
         # read file contents
-        with args.file as file:
-            contents = file.read()
+        if args.file:
+            with args.file as file:
+                contents = file.read()
+        elif not sys.stdin.isatty():
+            # Input is being piped in
+            contents = sys.stdin.read()
+        else:
+            contents = None
 
-        if args.mapping is None and args.skip > 0:
+        # raise error if no contents are provided
+        assert contents, 'No contents provided, either use --file or -f flag, or pipe data to stdin.'
+
+        if args.mapping is None or args.mapping == '':
+            assert args.skip > 0, 'No mapping provided and skip is zero. Specify a mapping using the --mapping or -m flag, or provide a file with a header row and --skip > 0.'
+            assert not args.transpose, 'Cannot transpose mapping when reading header from data file.'
             # use first line of contents as mapping
             args.mapping = contents.splitlines()[0]
 
+        # if verbose, print mapping
+        if args.verbose:
+            print(f'Mapping: {args.mapping}')
+
         csv = invoker.post_table(args.table, args.mapping, args.query, contents,
                                  skiprows=args.skip,
-                                 insert='I' in enable,
-                                 update='U' in enable,
-                                 delete='D' in enable,
-                                 execute='E' in enable,
-                                 commit='C' in enable,
+                                 insert='I' in args.enable,
+                                 update='U' in args.enable,
+                                 delete='D' in args.enable,
+                                 execute='E' in args.enable,
+                                 commit='C' in args.enable,
                                  format=args.format or 'diff',
                                  deduplicate=args.deduplicate)
         print(csv)
@@ -159,6 +194,40 @@ def validate_flags(value):
         raise argparse.ArgumentTypeError(f"Invalid combination: {value}. Only the letters I, U, D, E, and C are allowed.")
 
     return value
+
+
+def _read_token_from_file(args):
+    # try to read token from local file if not provided in arguments
+    if not args.token:
+        try:
+            with open('.stimula_token', 'r') as file:
+                args.token = file.read()
+        except FileNotFoundError:
+            pass
+
+
+def _write_token_to_file(token):
+    # write token to local file
+    with open('.stimula_token', 'w') as file:
+        file.write(token)
+
+
+def _read_mapping_from_file(args):
+    # check if args.mapping is an existing file name
+    if args.mapping and os.path.exists(args.mapping):
+        with open(args.mapping, 'r') as file:
+            # read the whole file, it may be a transposed mapping
+            args.mapping = file.read()
+
+
+def _transpose_mapping(args):
+    assert args.mapping, 'Mapping must be provided when transposing.'
+    # get string from args.mapping, remove lines starting with #
+    mapping = '\n'.join(line for line in args.mapping.splitlines() if not line.startswith('#'))
+    # use pandas to read the mapping string into a dataframe
+    df = pd.read_csv(StringIO(mapping), header=None)
+    # transpose the dataframe, dispose all but the first row and convert to csv
+    args.mapping = df.T.head(1).to_csv(header=False, index=False)
 
 
 if __name__ == '__main__':
