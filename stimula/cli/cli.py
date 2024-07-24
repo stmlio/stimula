@@ -52,7 +52,7 @@ from stimula.cli import local, remote
 
 def main():
     parser = argparse.ArgumentParser(description='Stimula CLI')
-    parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post'])
+    parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose'])
     parser.add_argument('-r', '--remote', help='Remote API URL')
     parser.add_argument('-H', '--host', help='Database host', default='localhost')
     parser.add_argument('-P', '--port', help='Database port', type=int, default=5432)
@@ -82,14 +82,18 @@ def main():
             # print message with stack trace
             raise e
         else:
-            # print message without stack trace
-            print(f'Error: {e}')
+            # print message without stack trace to stderr
+            print(f'Error: {e}', file=sys.stderr)
+
+        sys.exit(1)
 
 
 def execute_command(args):
-    # if verbose, print working directory
-    if args.verbose:
-        print(f'Working directory: {os.getcwd()}')
+
+    if args.command == 'transpose':
+        # transpose stdin to stdout and exit
+        _transpose_stdin_stdout()
+        return
 
     if args.remote:
         # if remote is specified, use remote invoker
@@ -194,6 +198,15 @@ def validate_flags(value):
         raise argparse.ArgumentTypeError(f"Invalid combination: {value}. Only the letters I, U, D, E, and C are allowed.")
 
     return value
+
+
+def _transpose_stdin_stdout():
+    # validate we have stdin
+    assert not sys.stdin.isatty(), 'No input provided, use piping to provide input.'
+    # read dataframe from stdin
+    df = pd.read_csv(sys.stdin, header=None)
+    # transpose the dataframe and write to stdout
+    df.T.to_csv(sys.stdout, header=False, index=False)
 
 
 def _read_token_from_file(args):
