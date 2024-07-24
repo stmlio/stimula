@@ -72,6 +72,8 @@ def main():
     parser.add_argument('-v', '--version', action='version', version=version('stimula'))
     parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
     parser.add_argument('-M', '--transpose', action='store_true', help='Transpose the mapping')
+    parser.add_argument('-x', '--execute', help='Script to execute on post')
+
 
     args = parser.parse_args()
 
@@ -185,8 +187,9 @@ def execute_command(args):
                                  delete='D' in args.enable,
                                  execute='E' in args.enable,
                                  commit='C' in args.enable,
-                                 format=args.format or 'diff',
-                                 deduplicate=args.deduplicate)
+                                 format=args.format,
+                                 deduplicate=args.deduplicate,
+                                 post_script=args.execute)
         print(csv)
 
 

@@ -4,8 +4,11 @@ This class provides the main database service to list tables, create mappings, r
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
+import importlib.util
 import logging
+import os
 import re
+import sys
 from io import StringIO
 
 import pandas as pd
@@ -135,9 +138,9 @@ class DB:
         # convert dataframe to csv
         return df.to_csv(index=False, escapechar=escapechar)
 
-    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False):
+    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None):
         # create diffs and sql
-        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate)
+        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
         # if execute
         if execute:
             # execute sql statements
@@ -150,9 +153,9 @@ class DB:
 
         return diffs
 
-    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False):
+    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None):
         # create diffs and sql
-        _, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate)
+        _, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
 
         # sort queries
         sorted_queries = self._sort_queries(sql)
@@ -190,7 +193,7 @@ class DB:
         # return dataframe
         return result
 
-    def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
+    def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False):
         with self._database_session() as (engine, metadata):
             # parse header to build syntax tree
             diffs, sql = self._get_diffs_and_sql(engine, metadata, table_name, header, where_clause, body, skiprows, insert, update, delete)
@@ -206,7 +209,7 @@ class DB:
 
             return result
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate):
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script):
         # get cnx from context
         cnx = cnx_context.cnx
 
@@ -214,7 +217,7 @@ class DB:
         mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
 
         # read dataframe from request first, so we can give feedback on errors in the request
-        df_request = self._read_from_request(mapping, body, skiprows, deduplicate)
+        df_request = self._read_from_request(mapping, body, skiprows, deduplicate, post_script)
 
         # read dataframe from DB
         df_db = self._read_from_db(mapping, where_clause, set_index=True)
@@ -227,7 +230,7 @@ class DB:
 
         return diffs, sqls
 
-    def _read_from_request(self, mapping, body, skiprows, deduplicate=False):
+    def _read_from_request(self, mapping, body, skiprows, deduplicate=False, post_script=None):
         # get columns and unique columns.
         column_names = HeaderCompiler().compile_list(mapping, include_skip=True)
         index_columns = HeaderCompiler().compile_list_unique(mapping)
@@ -298,6 +301,11 @@ class DB:
         # deduplicate if requested
         if deduplicate:
             df_padded = self._deduplicate(df_padded, index_columns)
+
+        # apply post script if provided
+        if post_script:
+            # execute post script
+            self._execute_post_script(df_padded, post_script)
 
         return df_padded
 
@@ -616,3 +624,23 @@ class DB:
 
         return df_final
 
+    def _execute_post_script(self, df, post_script):
+        # skip if no post script provided
+        if post_script is None:
+            return df
+
+        # assert that post_script file exists
+        assert os.path.exists(post_script), f"Post script file {post_script} not found"
+
+        # import the post script module
+        module_name = 'post_script'
+        spec = importlib.util.spec_from_file_location(module_name, post_script)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+        # verify that the module has an execute function
+        assert hasattr(module, 'execute'), f"Post script module {post_script} must have an execute function"
+
+        # execute the post script
+        return module.execute(df)

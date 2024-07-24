@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import pytest
 from numpy import NaN, nan, isnan
@@ -342,6 +344,7 @@ def test_get_count_with_error(db, books, context):
     with pytest.raises(Exception, match='column "abc" does not exist.*'):
         db.get_count('books', None, 'authorid = abc')
 
+
 def test_post_table_padding(db, books):
     # test that it can pad with empty columns if needed
     body = '''
@@ -375,3 +378,27 @@ def test_post_table_padding_with_unique_default(db, books):
     ).astype(dtypes)
 
     assert df.equals(expected)
+
+
+def _find_file(folder, file):
+    # find absolute path for script, search in subfolders, so it works in tests
+    for root, dirs, files in os.walk(folder):
+        if file in files:
+            return os.path.join(root, file)
+    raise FileNotFoundError(f"Could not find {file}")
+
+
+def test_post_script(db):
+    # create dataframe
+    df = pd.DataFrame([['Emma', 'Jane Austen']], columns=['title', 'author'])
+
+    # find absolute path for post_script.py, search in subfolders so it works in tests
+    script_path = _find_file('..', 'post_script.py')
+
+    # call execute_post_script
+    result = db._execute_post_script(df, script_path)
+
+    # assert that the script has transposed the dataframe
+    expected = df.T
+
+    assert result.equals(expected)
