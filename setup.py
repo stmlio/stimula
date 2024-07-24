@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='stimula',
-    version='0.0.5',
+    version='0.0.6',
     description='Toolset library for Simple Table Mapping Language (STML)',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -10,7 +10,6 @@ setup(
     author='Romke Jonker',
     author_email='romke@rnadesign.net',
     packages=find_packages(),
-    # py_modules=['stimula.cli.cli'],
     install_requires=[
         'pyjwt',
         'sqlalchemy',
