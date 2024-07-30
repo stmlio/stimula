@@ -69,18 +69,11 @@ class Invoker:
         path = f"tables/{table}"
 
         # send filter as query parameter
-        params = {"h": header, "q": query, 'skiprows': skiprows, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit, 'style': format}
+        params = {"h": header, "q": query, 'skiprows': skiprows, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit, 'deduplicate': deduplicate,
+                  'style': format}
 
         # return the token from json response
         return self.post(path, params, contents).text
-        if format == None or format == 'diff':
-            post_result = self._db.post_table_get_diff(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit)
-            return '\n\n'.join([df.to_csv(index=False) for df in post_result])
-        elif format == 'sql':
-            # get diff, create sql, execute if requested and return a single data frame
-            post_result = self._db.post_table_get_sql(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit)
-            # convert df to response body, use double quotes where needed
-            return post_result.to_csv(index=False, quotechar="\"")
 
     def get(self, path, params):
         # create connection url
