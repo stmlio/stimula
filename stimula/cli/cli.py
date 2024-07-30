@@ -18,6 +18,7 @@ Commands:
 - post: Post data to a table from a specified file.
 
 Options:
+-h, --help        Print help message
 -r, --remote      Remote API URL
 -H, --host        Database host (default: localhost)
 -P, --port        Database port (default: 5432)
@@ -37,6 +38,7 @@ Options:
 -v, --version     Print version information
 -V, --verbose     Increase output verbosity
 -M, --transpose   Transpose the mapping
+-x, --execute     Script to execute on post
 """
 
 import argparse
@@ -51,7 +53,7 @@ from stimula.cli import local, remote
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Stimula CLI')
+    parser = argparse.ArgumentParser(description='stimula - The STML CLI')
     parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose'])
     parser.add_argument('-r', '--remote', help='Remote API URL')
     parser.add_argument('-H', '--host', help='Database host', default='localhost')
@@ -106,7 +108,7 @@ def execute_command(args):
             args.key = os.getenv('STIMULA_KEY')
 
         # if key is still not provided, raise an error
-        assert args.key, 'Secret key must be provided, either as --key argument or STIMULA_KEY environment variable'
+        assert args.key, 'Secret key must be provided for local connection. Either connect to remote API, or set --key argument, or STIMULA_KEY environment variable'
 
         # use local invoker
         invoker = local.Invoker(args.key, args.host, args.port)

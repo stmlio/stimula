@@ -22,7 +22,6 @@ import json
 
 import numpy
 import pandas as pd
-from numpy import int64
 from psycopg2._json import Json
 
 from .query_executor import SimpleQueryExecutor, DependentQueryExecutor
@@ -166,9 +165,13 @@ class SqlCreator:
         if isinstance(value, str):
             value = value.strip()
 
-        # convert int64 to int
-        if isinstance(value, int64):
+        # convert numpy.int64 to int
+        if isinstance(value, numpy.int64):
             value = int(value)
+
+        # convert numpy.float64 to float
+        if isinstance(value, numpy.float64):
+            value = float(value)
 
         # convert numpy bool to python bool
         if isinstance(value, numpy.bool_):

@@ -246,6 +246,9 @@ def test_clean_values_in_dict():
     assert SqlCreator()._clean_values_in_dict({'name': '  Jane Austen  '}) == {'name': 'Jane Austen'}
     # test that it converts int64 to int
     assert SqlCreator()._clean_values_in_dict({'year': int64(1813)}) == {'year': 1813}
+    # test that it converts a np.float64 into a Float
+    price = SqlCreator()._clean_values_in_dict({'price': numpy.float64(12.34)})
+    assert type(price['price']) == float
     # test that it converts multiple values at once
     assert SqlCreator()._clean_values_in_dict({'name': '  Jane Austen  ', 'year': int64(1813)}) == {'name': 'Jane Austen', 'year': 1813}
     # test that it converts numpy bool to python bool

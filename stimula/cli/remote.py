@@ -65,7 +65,7 @@ class Invoker:
         # return the token from json response
         return self.get(path, params).text
 
-    def post_table(self, table, header, query, contents, skiprows, insert, update, delete, execute, commit, format, deduplicate):
+    def post_table(self, table, header, query, contents, skiprows, insert, update, delete, execute, commit, format, deduplicate, post_script):
         path = f"tables/{table}"
 
         # send filter as query parameter
@@ -114,6 +114,9 @@ class Invoker:
 
         # if the response is not 200, raise an exception
         if response.status_code != 200:
-            raise Exception(f"Request failed: {response.json()['msg']}\nRemote trace: {response.json()['trace']}")
+            try:
+                raise Exception(f"Request failed: {response.json()['msg']}\nRemote trace: {response.json()['trace']}")
+            except:
+                raise Exception(f"Request failed: {response.text}")
 
         return response
