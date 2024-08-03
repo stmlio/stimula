@@ -18,13 +18,12 @@ Turning a diff into SQL statements works as follows:
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
-import json
 
 import numpy
 import pandas as pd
 from psycopg2._json import Json
 
-from .query_executor import SimpleQueryExecutor, DependentQueryExecutor
+from .query_executor import SimpleQueryExecutor, DependentQueryExecutor, OperationType
 from ..compiler.alias_compiler import AliasCompiler
 from ..compiler.delete_compiler import DeleteCompiler
 from ..compiler.header_compiler import HeaderCompiler
@@ -49,10 +48,13 @@ class SqlCreator:
             row = diffs.iloc[i]
 
             # create query for row
-            query, value_dict = self._create_sql_row(aliased_mapping, row)
+            operation_type, query, value_dict = self._create_sql_row(aliased_mapping, row)
+
+            # return line number, depends on operation type
+            line_number = self._get_line_number(row)
 
             # yield query and split columns
-            yield SimpleQueryExecutor(query, value_dict)
+            yield SimpleQueryExecutor(line_number, operation_type, aliased_mapping['table'], query, value_dict)
 
     def _create_sql_row(self, mapping, row):
         # Create a dictionary with unique column headers as keys and values as values. We'll need these for all query types.
@@ -80,9 +82,9 @@ class SqlCreator:
         value_dict_clean = self._clean_values_in_dict(split_parameter_value_dict)
 
         # Compile the filtered tree to get the query for a row. Use the parameter dictionary where needed. For example, in SQL you write 'x = 1' but 'x is null'
-        query = self._create_query(filtered_mapping, value_dict_clean)
+        operation_type, query = self._create_query(filtered_mapping, value_dict_clean)
 
-        return query, value_dict_clean
+        return operation_type, query, value_dict_clean
 
     def _create_unique_value_dict(self, mapping, row):
         # get unique column headers
@@ -193,6 +195,7 @@ class SqlCreator:
 class InsertSqlCreator(SqlCreator):
 
     def create_sql(self, mapping, diffs):
+        # override to create dependent insert queries for extensions
         for query_executor in super().create_sql(mapping, diffs):
 
             # is there an extension on the root table?
@@ -205,7 +208,6 @@ class InsertSqlCreator(SqlCreator):
                 dependent_query = self._create_extension_insert_query(mapping, query_executor.params)
                 dependent_query_executor = DependentQueryExecutor((query_executor.query, query_executor.params), dependent_query)
                 yield dependent_query_executor
-
 
     def _create_non_unique_value_dict(self, mapping, row):
         # call super to get all other columns and values
@@ -221,7 +223,7 @@ class InsertSqlCreator(SqlCreator):
 
     def _create_query(self, mapping, value_dict):
         # create insert query
-        return InsertCompiler().compile(mapping)
+        return OperationType.INSERT, InsertCompiler().compile(mapping)
 
     def _create_extension_insert_query(self, mapping, param):
         # get extension foreign keys
@@ -241,6 +243,10 @@ class InsertSqlCreator(SqlCreator):
         sql = f'insert into {table} (name, module, model, res_id) values (:name, :module, :model, :res_id)'
         values = {'name': name, 'module': qualifier, 'model': model, 'res_id': None}
         return sql, values
+
+    def _get_line_number(self, row):
+        # for inserts, just return __line__ column
+        return row['__line__']
 
 
 class UpdateSqlCreator(SqlCreator):
@@ -294,8 +300,8 @@ class UpdateSqlCreator(SqlCreator):
 
     def _split_diff_self_other(self, row):
         # extract self and other columns into a new Series
-        self_row = row[[column for column in row.index if (column[1] in ['', 'self'])]]
-        other_row = row[[column for column in row.index if (column[1] in ['', 'other'])]]
+        self_row = row[[column for column in row.index if (column[0] != '__line__' and column[1] in ['', 'self'])]]
+        other_row = row[[column for column in row.index if (column[0] != '__line__' and column[1] in ['', 'other'])]]
 
         # replace header tuples with original column names
         self_row.index = [column[0] for column in self_row.index]
@@ -321,7 +327,11 @@ class UpdateSqlCreator(SqlCreator):
 
     def _create_query(self, tree, value_dict):
         # create query
-        return UpdateCompiler().compile(tree)
+        return OperationType.UPDATE, UpdateCompiler().compile(tree)
+
+    def _get_line_number(self, row):
+        # for updates, the column contains Series, not sure how to change that
+        return row['__line__'][0]
 
 
 class DeleteSqlCreator(SqlCreator):
@@ -331,4 +341,8 @@ class DeleteSqlCreator(SqlCreator):
 
     def _create_query(self, mapping, value_dict):
         # create query
-        return DeleteCompiler().compile(mapping)
+        return OperationType.DELETE, DeleteCompiler().compile(mapping)
+
+    def _get_line_number(self, row):
+        # deletes don't have a matching input row
+        return None

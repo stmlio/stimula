@@ -24,6 +24,7 @@ from stimula.header.header_merger import HeaderMerger
 from stimula.header.odoo_header_parser import OdooHeaderParser
 from .context import cnx_context, get_metadata
 from .diff_to_sql import DiffToSql
+from .query_executor import ExecutionResult, OperationType
 
 _logger = logging.getLogger(__name__)
 
@@ -155,19 +156,59 @@ class DB:
 
     def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None):
         # create diffs and sql
-        _, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
-
-        # sort queries
-        sorted_queries = self._sort_queries(sql)
+        _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
 
         if execute:
             # execute sql statements
-            sqls = self._execute_sql(sorted_queries, commit)
+            sqls = self._execute_sql(query_executors, commit)
         else:
-            sqls = [(None, qe.query, qe.params) for qe in sorted_queries]
+            sqls = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params) for qe in query_executors]
 
         # convert sql to dataframe
         return self._convert_to_df(sqls, execute)
+
+    def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False,
+                                   post_script=None, context=None):
+        # create diffs and sql
+        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
+
+        if execute:
+            # execute sql statements
+            execution_results = self._execute_sql(query_executors, commit)
+        else:
+            execution_results = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params) for qe in query_executors]
+
+        # create full report
+        return self._create_post_report(diff, execution_results, execute, commit, context)
+
+    def _create_post_report(self, diff, execution_results, execute, commit, context):
+        insert, update, delete = diff
+        found = {'insert': len(insert), 'update': len(update), 'delete': len(delete)}
+
+        summary = {'found': found, 'execute': execute, 'commit': commit}
+
+        result = {'summary': summary}
+
+        if context:
+            result['context'] = context
+
+        # only set success & failed if execute is True
+        if execute:
+            # summarize successful operations
+            summary['success'] = {'insert': len([er for er in execution_results if er.operation_type == OperationType.INSERT and er.success]),
+                       'update': len([er for er in execution_results if er.operation_type == OperationType.UPDATE and er.success]),
+                       'delete': len([er for er in execution_results if er.operation_type == OperationType.DELETE and er.success])}
+
+            # summarize failed operations
+            summary['failed'] = {'insert': len([er for er in execution_results if er.operation_type == OperationType.INSERT and not er.success]),
+                      'update': len([er for er in execution_results if er.operation_type == OperationType.UPDATE and not er.success]),
+                      'delete': len([er for er in execution_results if er.operation_type == OperationType.DELETE and not er.success])}
+
+        # list execution results
+        rows = [er.to_dict(execute) for er in execution_results]
+        result['rows'] = rows
+
+        return result
 
     def _convert_to_df(self, sqls, showResult):
         # create empty pandas dataframe. First column contains sql
@@ -178,11 +219,11 @@ class DB:
 
         # iterate sql statements
         index = 0
-        for rows, query, value_dict in sqls:
+        for er in sqls:
             # create dictionary with query and value_dict
-            value_dict = {**value_dict, 'sql': query}
+            value_dict = {**er.params, 'sql': er.query}
             if showResult:
-                value_dict = {**value_dict, 'rows': rows}
+                value_dict = {**value_dict, 'rows': er.rowcount}
             # append a new row to the bottom result with values from value dictionary using concat
             result = pd.concat([result, pd.DataFrame(value_dict, index=[index])], ignore_index=True)
             index += 1
@@ -298,9 +339,22 @@ class DB:
         # evaluate column expressions
         self._evaluate_expressions(df_padded, mapping, index_columns)
 
+        # insert a column with line numbers
+        df_padded.insert(0, '__line__', range(0, len(df)))
+
         # deduplicate if requested
         if deduplicate:
             df_padded = self._deduplicate(df_padded, index_columns)
+
+        # verify that there are no duplicate index values
+        if df_padded.index.has_duplicates:
+            # find duplicate index values
+            duplicates = df_padded.index[df_padded.index.duplicated()]
+            # convert to name-value dict
+            duplicate_map = {k: v for k, v in zip(duplicates.names, duplicates.values)}
+
+            raise ValueError(f"Duplicates found: {duplicate_map}")
+
 
         # apply post script if provided
         if post_script:
@@ -397,31 +451,57 @@ class DB:
         inserts = df_request[df_request.index.isin(inserted_indices)]
         inserts.reset_index(inplace=True)
 
+        # move __line__ to become the left most column after index reset
+        inserts = self._move_line_to_front(inserts)
+
         # find rows to delete
         deleted_indices = set(df_db.index.values).difference(df_request.index.values)
         deletes = df_db[df_db.index.isin(deleted_indices)]
         deletes.reset_index(inplace=True)
 
-        # find rows to update
+        # find rows to update. Left is from request, right is from database
         left = df_request[~df_request.index.isin(inserted_indices)]
         right = df_db[~df_db.index.isin(deleted_indices)]
 
         # Sort the right DataFrame to match the index of the left DataFrame
         right_df_sorted = right.reindex(left.index)
 
+        # left (from request) has __line__ column. Create a copy without line numbers for comparison
+        left_no_line = left.drop(columns=['__line__'])
+
         # get mask of cells that are N/A or '' in left and right
-        mask = (left.isna() | left.eq('')) & (right_df_sorted.isna() | right_df_sorted.eq(''))
+        mask = (left_no_line.isna() | left_no_line.eq('')) & (right_df_sorted.isna() | right_df_sorted.eq(''))
 
         # replace N/A or '' with None using mask to ignore differences in N/A or ''
-        left = left.mask(mask, None)
+        left_no_line = left_no_line.mask(mask, None)
         right_df_sorted = right_df_sorted.mask(mask, None)
 
         # compare remaining rows
-        updates = left.compare(right_df_sorted)
+        updates = left_no_line.compare(right_df_sorted)
+
+        # insert __line__ column, recovering line numbers from left by index
+        updates['__line__'] = left.loc[updates.index]['__line__']
+
+        # reset index for updates to match the insert and deletes
         updates.reset_index(inplace=True)
+
+        # move __line__ to become the left most column
+        updates = self._move_line_to_front(updates)
 
         # return result
         return inserts if insert else DataFrame(), updates if update else DataFrame(), deletes if delete else DataFrame()
+
+    def _move_line_to_front(self, df):
+        # move __line__ to become the left most column. This has no real function, but it makes the dataframes more readable
+         # this must also work with the multi-index dataframes coming from the compare function
+        # get __line__ column as a series
+        line = df['__line__']
+        # drop __line__ column
+        df = df.drop(columns=['__line__'])
+        # insert __line__ column as first column
+        df.insert(0, '__line__', line)
+        return df
+
 
     def get_select_statement(self, table_name, header, where_clause=None):
         # get cnx from context
@@ -476,13 +556,6 @@ class DB:
 
         return merged_mapping
 
-    def _sort_queries(self, queries):
-        inserts, updates, deletes = queries
-
-        # order all queries, start with deletes
-        sorted_queries = list(deletes) + list(inserts) + list(updates)
-        return sorted_queries
-
     def _execute_sql(self, query_executors, commit=False):
         # get cursor from context
         cr = cnx_context.cr
@@ -492,9 +565,9 @@ class DB:
         # iterate query executors
         for query_executor in query_executors:
             # delegate execution to query executor
-            execute_result = query_executor.execute(cr)
+            execution_result = query_executor.execute(cr)
             # append result to list
-            result.append(execute_result)
+            result.append(execution_result)
 
         # commit if requested
         if commit:

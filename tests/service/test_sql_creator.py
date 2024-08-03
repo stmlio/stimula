@@ -5,6 +5,7 @@ from numpy import int64, nan, NaN
 
 from stimula.compiler.alias_compiler import AliasCompiler
 from stimula.header.csv_header_parser import HeaderParser
+from stimula.service.query_executor import OperationType
 from stimula.service.sql_creator import SqlCreator, InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
 
 
@@ -12,9 +13,9 @@ def test_create_sql(meta, books, lexer):
     header = 'title[unique=true], authorid(name)'
     mapping = HeaderParser(meta, 'books').parse_csv(header)
     inserts = pd.DataFrame([
-        ['Pride and Prejudice', 'Jane Austen'],
+        ['Pride and Prejudice', 0, 'Jane Austen'],
     ],
-        columns=['title[unique=true]', 'authorid(name)']
+        columns=['title[unique=true]', '__line__', 'authorid(name)']
     )
     result = list(InsertSqlCreator().create_sql(mapping, inserts))
 
@@ -28,13 +29,13 @@ def test_create_sql_multiple_update_rows(meta, books, lexer):
     header = 'title[unique=true], authorid(name), description'
     mapping = HeaderParser(meta, 'books').parse_csv(header)
     # create multi index series with self/other columns
-    columns = pd.MultiIndex.from_tuples([('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')])
+    # columns = ['__line__'] + pd.MultiIndex.from_tuples([('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')])
 
     updates = pd.DataFrame([
-        ['Pride and Prejudice', 'Charles Dickens', 'Jane Austen', NaN, NaN],
-        ['David Copperfield', NaN, NaN, 'A novel by Charles Dickens, narrated by ...', NaN],
+        [(0,), 'Pride and Prejudice', 'Charles Dickens', 'Jane Austen', NaN, NaN],
+        [(1,), 'David Copperfield', NaN, NaN, 'A novel by Charles Dickens, narrated by ...', NaN],
     ],
-        columns=columns
+        columns=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')]
     )
     updates = list(UpdateSqlCreator().create_sql(mapping, updates))
 
@@ -51,10 +52,10 @@ def test_create_sql_row_insert(meta, books, lexer):
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     # create series with column names
-    row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
+    row = pd.Series([0, 'Pride and Prejudice', 'Jane Austen'], index=['__line__', 'title[unique=true]', 'authorid(name)'])
 
     result = InsertSqlCreator()._create_sql_row(mapping, row)
-    expected = ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+    expected = (OperationType.INSERT, 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
                 {'title': 'Pride and Prejudice', 'name': 'Jane Austen'})
     assert result == expected
 
@@ -63,10 +64,10 @@ def test_create_sql_row_insert_skip_empty_column(books, meta, lexer):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
-    row = pd.Series(['Pride and Prejudice', ''], index=['title[unique=true]', 'authorid(name)'])
+    row = pd.Series( [0, 'Pride and Prejudice', ''], index=['__line__', 'title[unique=true]', 'authorid(name)'])
     result = InsertSqlCreator()._create_sql_row(mapping, row)
 
-    expected = ('insert into books(title) select :title', {'title': 'Pride and Prejudice'})
+    expected = (OperationType.INSERT, 'insert into books(title) select :title', {'title': 'Pride and Prejudice'})
 
     assert result == expected
 
@@ -75,10 +76,10 @@ def test_create_sql_row_insert_skip_nan(books, meta, lexer):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
-    row = pd.Series(['Pride and Prejudice', NaN], index=['title[unique=true]', 'authorid(name)'])
+    row = pd.Series([0, 'Pride and Prejudice', NaN], index=['__line__', 'title[unique=true]', 'authorid(name)'])
     result = InsertSqlCreator()._create_sql_row(mapping, row)
 
-    expected = ('insert into books(title) select :title', {'title': 'Pride and Prejudice'})
+    expected = (OperationType.INSERT, 'insert into books(title) select :title', {'title': 'Pride and Prejudice'})
 
     assert result == expected
 
@@ -88,10 +89,10 @@ def test_create_sql_row_update(books, meta, lexer):
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     # test that it creates an update sql query and a value dict
-    row = pd.Series(['Pride and Prejudice', 'Joseph Heller', 'Jane Austen'], index=[('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
+    row = pd.Series([(0,), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'], index=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
     result = UpdateSqlCreator()._create_sql_row(mapping, row)
 
-    expected = ('update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
+    expected = (OperationType.UPDATE, 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
                 {'title': 'Pride and Prejudice', 'name': 'Joseph Heller'})
 
     assert result == expected
@@ -116,7 +117,7 @@ def test_create_sql_row_delete(books, meta, lexer):
     row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
 
     result = DeleteSqlCreator()._create_sql_row(mapping, row)
-    expected = ('delete from books where books.title = :title',
+    expected = (OperationType.DELETE, 'delete from books where books.title = :title',
                 {'title': 'Pride and Prejudice'})
     assert result == expected
 
@@ -128,7 +129,7 @@ def test_delete_sql_split_columns(books, meta, lexer):
     row = pd.Series(['Pride and Prejudice:1'], index=['title:authorid[unique=true]'])
     result = DeleteSqlCreator()._create_sql_row(mapping, row)
 
-    expected = ('delete from books where books.title = :title and books.authorid = :authorid',
+    expected = (OperationType.DELETE, 'delete from books where books.title = :title and books.authorid = :authorid',
                 {'title': 'Pride and Prejudice', 'authorid': 1})
     assert result == expected
 

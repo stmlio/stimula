@@ -65,7 +65,7 @@ class Invoker:
         # return the token from json response
         return self.get(path, params).text
 
-    def post_table(self, table, header, query, contents, skiprows, insert, update, delete, execute, commit, format, deduplicate, post_script):
+    def post_table(self, table, header, query, contents, skiprows, insert, update, delete, execute, commit, format, deduplicate, post_script, context):
         path = f"tables/{table}"
 
         # send filter as query parameter

@@ -1,10 +1,12 @@
 import os
+import re
 
 import pandas as pd
 import pytest
 from numpy import NaN, nan, isnan
 
-from stimula.service.query_executor import SimpleQueryExecutor
+from stimula.header.csv_header_parser import HeaderParser
+from stimula.service.query_executor import SimpleQueryExecutor, OperationType
 
 
 def test_tables(books, db, context):
@@ -86,6 +88,7 @@ def test_get_table_empty_columns(db, books, cnx):
 
 
 def test_post_table_get_diff_no_changes(db, books, context):
+    # verify that processing a table with no changes results in empty diffs
     body = '''
         Emma, Jane Austen
         War and Peace, Leo Tolstoy
@@ -112,8 +115,8 @@ def test_post_table_get_diff_with_changes(db, books):
     '''
     create, update, delete = db.post_table_get_diff('books', 'title[unique=true], authorid(name)', None, body, insert=True, update=True, delete=True)
 
-    expected_create = [['Catch XIII', 'Joseph Heller'], ['A Christmas Carol', 'Charles Dickens']]
-    expected_update = [['Anna Karenina', 'Joseph Heller', 'Leo Tolstoy']]
+    expected_create = [[2, 'Catch XIII', 'Joseph Heller'], [6, 'A Christmas Carol', 'Charles Dickens']]
+    expected_update = [[5, 'Anna Karenina', 'Joseph Heller', 'Leo Tolstoy']]
     expected_delete = [['Catch-22', 'Joseph Heller']]
 
     assert create.values.tolist() == expected_create
@@ -127,7 +130,7 @@ def test_post_table_get_diff_with_default_values(db, books):
     '''
     create, update, delete = db.post_table_get_diff('books', 'title[unique=true], authorid(name)[default-value="Jane Austen"], price[default-value=20]', None, body, update=True)
 
-    expected_update = [['Emma', 20, 10.99]]
+    expected_update = [[0, 'Emma', 20, 10.99]]
 
     assert update.values.tolist() == expected_update
 
@@ -140,7 +143,7 @@ def test_post_table_get_diff_with_expression(db, books):
     '''
     create, update, delete = db.post_table_get_diff('books', header, None, body, update=True)
 
-    expected_update = [['War and Peace', 'the new description', '']]
+    expected_update = [[0, 'War and Peace', 'the new description', '']]
 
     assert update.values.tolist() == expected_update
 
@@ -172,10 +175,10 @@ def test_post_table_get_sql_with_changes(db, books, context):
 
     dtypes = {'sql': 'string', 'title': 'string', 'name': 'string'}
     expected = pd.DataFrame([
-        ['delete from books where books.title = :title', 'Catch-22', NaN],
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'Catch XIII', 'Joseph Heller'],
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'A Christmas Carol', 'Charles Dickens'],
-        ['update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', 'Anna Karenina', 'Joseph Heller']
+        ['update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', 'Anna Karenina', 'Joseph Heller'],
+        ['delete from books where books.title = :title', 'Catch-22', NaN],
     ],
         columns=['sql', 'title', 'name']
     ).astype(dtypes)
@@ -198,10 +201,10 @@ def test_post_table_get_sql_with_changes_with_empty_columns(db, books, context):
 
     dtypes = {'sql': 'string', 'title': 'string', 'name': 'string'}
     expected = pd.DataFrame([
-        ['delete from books where books.title = :title', 'Catch-22', NaN],
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'Catch XIII', 'Joseph Heller'],
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'A Christmas Carol', 'Charles Dickens'],
-        ['update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', 'Anna Karenina', 'Joseph Heller']
+        ['update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', 'Anna Karenina', 'Joseph Heller'],
+        ['delete from books where books.title = :title', 'Catch-22', NaN],
     ],
         columns=['sql', 'title', 'name']
     ).astype(dtypes)
@@ -241,39 +244,45 @@ def test_post_table_update_with_missing_unique_column(db, books, context):
 
 def test_execute_sql_no_commit(db, books, context):
     sql = [
-        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
-        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Witches', 'name': 'Charles Dickens'}),
-        SimpleQueryExecutor('update books set authorid = authors.author_id from authors where title = :title and authors.name = :name', {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
-        SimpleQueryExecutor('delete from books where title = :title', {'title': 'Catch-22'})
+        SimpleQueryExecutor(0, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+                            {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
+        SimpleQueryExecutor(1, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+                            {'title': 'Witches', 'name': 'Charles Dickens'}),
+        SimpleQueryExecutor(2, OperationType.UPDATE, 'books', 'update books set authorid = authors.author_id from authors where title = :title and authors.name = :name',
+                            {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
+        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'})
     ]
     result = db._execute_sql(sql)
 
-    rowcounts = [r for (r, q, p) in result]
+    rowcounts = [er.rowcount for er in result]
     expected = [1, 1, 1, 1]
     assert rowcounts == expected
 
 
 def test_execute_sql_with_commit(db, books, context):
     sql = [
-        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
-        SimpleQueryExecutor('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'title': 'Witches', 'name': 'Charles Dickens'}),
-        SimpleQueryExecutor('update books set authorid = authors.author_id from authors where title = :title and authors.name = :name', {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
-        SimpleQueryExecutor('delete from books where title = :title', {'title': 'Catch-22'})
+        SimpleQueryExecutor(0, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+                            {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
+        SimpleQueryExecutor(1, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+                            {'title': 'Witches', 'name': 'Charles Dickens'}),
+        SimpleQueryExecutor(2, OperationType.UPDATE, 'books', 'update books set authorid = authors.author_id from authors where title = :title and authors.name = :name',
+                            {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
+        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'})
     ]
     result = db._execute_sql(sql, commit=True)
-    rowcounts = [r for (r, q, p) in result]
+    rowcounts = [er.rowcount for er in result]
     expected = [1, 1, 1, 1]
     assert rowcounts == expected
 
 
 def test_compare(db):
     # create two dataframes
-    left = pd.DataFrame([['Emma', 'Jane Austen']], columns=['title', 'author'])
+    left = pd.DataFrame([[0, 'Emma', 'Jane Austen']], columns=['__line__', 'title', 'author'])
     right = pd.DataFrame([['Emma', None]], columns=['title', 'author'])
     _, result, _ = db._compare(left, right, insert=True, update=True, delete=True)
     expected = pd.DataFrame([
-        [0, 'Jane Austen', None],
-    ], columns=[('index', ''), ('author', 'self'), ('author', 'other')])
+        [0, 0, 'Jane Austen', None],
+    ], columns=[('__line__', ''), ('index', ''), ('author', 'self'), ('author', 'other')])
     assert result.equals(expected)
 
 
@@ -352,11 +361,11 @@ def test_post_table_padding(db, books):
     '''
     create, update, delete = db.post_table_get_diff('books', 'title[unique=true], authorid(name), description', None, body, insert=True, update=True, delete=True)
 
-    expected_create = ['Pride and Prejudice', 'Jane Austen', nan]
+    expected_create = [0, 'Pride and Prejudice', 'Jane Austen', nan]
 
     # check nan values separately, bec you can't compare them
     assert create.values.tolist()[0][:2] == expected_create[:2]
-    assert isnan(create.values.tolist()[0][2])
+    assert isnan(create.values.tolist()[0][3])
 
 
 def test_post_table_padding_with_unique_default(db, books):
@@ -402,3 +411,116 @@ def test_post_script(db):
     expected = df.T
 
     assert result.equals(expected)
+
+
+def test_post_table_get_full_report(db, books, context):
+    body = '''
+        Emma, Jane Austen
+        War and Peace, Jane Austen
+        Catch XIII, Joseph Heller
+        David Copperfield, Charlie Dickens
+        Good as Gold, Joseph Heller
+        Anna Karenina, Joseph Heller
+        A Christmas Carol, Charles Dickens
+    '''
+    full_report = db.post_table_get_full_report('books', 'title[unique=true], authorid(name)', None, body, insert=True, update=True, delete=True, execute=True, context='my table')
+    expected = {
+        'context': 'my table',
+        'summary': {
+            'execute': True, 'commit': False,
+            'found': {'insert': 2, 'update': 3, 'delete': 1},
+            'success': {'insert': 2, 'update': 2, 'delete': 1},
+            'failed': {'insert': 0, 'update': 1, 'delete': 0}
+        }, 'rows': [
+            {'line_number': 2, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books',
+             'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+             'params': {'title': 'Catch XIII', 'name': 'Joseph Heller'}},
+            {'line_number': 6, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books',
+             'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+             'params': {'title': 'A Christmas Carol', 'name': 'Charles Dickens'}},
+            {'line_number': 1, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books',
+             'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
+             'params': {'title': 'War and Peace', 'name': 'Jane Austen'}},
+            {'line_number': 3, 'operation_type': OperationType.UPDATE, 'success': False, 'rowcount': 0, 'table': 'books',
+             'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
+             'params': {'name': 'Charlie Dickens', 'title': 'David Copperfield'},
+             'error': 'No row was inserted'},
+            {'line_number': 5, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books',
+             'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
+             'params': {'title': 'Anna Karenina', 'name': 'Joseph Heller'}},
+            {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table': 'books',
+             'query': 'delete from books where books.title = :title',
+             'params': {'title': 'Catch-22'}}
+        ]}
+
+    assert full_report == expected
+
+
+def test_post_table_get_full_report_no_execute(db, books, context):
+    body = '''
+        Emma, Jane Austen
+        War and Peace, Jane Austen
+        Catch XIII, Joseph Heller
+        David Copperfield, Charlie Dickens
+        Good as Gold, Joseph Heller
+        Anna Karenina, Joseph Heller
+        A Christmas Carol, Charles Dickens
+    '''
+    full_report = db.post_table_get_full_report('books', 'title[unique=true], authorid(name)', None, body, insert=True, update=True, delete=True, context='my table')
+    expected_summary = {
+        'execute': False, 'commit': False,
+        'found': {'insert': 2, 'update': 3, 'delete': 1},
+    }
+
+    assert full_report['summary'] == expected_summary
+
+    rows = full_report['rows']
+
+    assert len(rows) == 6
+
+
+def test_read_from_request(db, books, meta):
+    table = 'books'
+    header = 'title[unique=true], authorid(name)'
+    mapping = HeaderParser(meta, table).parse_csv(header)
+    body = '''
+        Emma, Jane Austen
+        War and Peace, Leo Tolstoy
+        Catch XIII, Joseph Heller
+        David Copperfield, Charles Dickens
+        Good as Gold, Joseph Heller
+        Anna Karenina, Joseph Heller
+        A Christmas Carol, Charles Dickens
+    '''
+
+    df = db._read_from_request(mapping, body, 0)
+
+    dtypes = {'title': 'string', 'authorid(name)': 'string'}
+    expected = pd.DataFrame([
+        ['Emma', 0, 'Jane Austen'],
+        ['War and Peace', 1, 'Leo Tolstoy'],
+        ['Catch XIII', 2, 'Joseph Heller'],
+        ['David Copperfield', 3, 'Charles Dickens'],
+        ['Good as Gold', 4, 'Joseph Heller'],
+        ['Anna Karenina', 5, 'Joseph Heller'],
+        ['A Christmas Carol', 6, 'Charles Dickens']
+    ],
+        columns=['title', '__line__', 'authorid(name)'],
+    ).astype(dtypes).set_index('title')
+
+    assert df.equals(expected)
+
+
+def test_read_from_request_detect_duplicate(db, books, meta):
+    # verify that duplicates in the input halts the import
+    table = 'books'
+    header = 'title[unique=true], authorid(name)'
+    mapping = HeaderParser(meta, table).parse_csv(header)
+    body = '''
+        Emma, Jane Austen
+        War and Peace, Leo Tolstoy
+        Catch XIII, Joseph Heller
+        Emma, Leo Tolstoy
+    '''
+    with pytest.raises(Exception, match=re.escape("Duplicates found: {'title[unique=true]': 'Emma'}")):
+        db._read_from_request(mapping, body, 0)

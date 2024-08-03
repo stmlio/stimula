@@ -1,8 +1,6 @@
 import pandas as pd
-from numpy import NaN
 
 from stimula.header.csv_header_parser import HeaderParser
-from stimula.service.diff_to_sql import DiffToSql
 from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator
 
 '''
@@ -21,8 +19,8 @@ def test_insert_sql_creator_external_id(books, meta):
     mapping = HeaderParser(meta, table_name).parse_csv(header)
 
     diff = pd.DataFrame([
-        ['Pride and Prejudice', '12345'],
-    ], columns=['title[unique=true]', 'bookid(name)'])
+        [0, 'Pride and Prejudice', '12345'],
+    ], columns=['__line__', 'title[unique=true]', 'bookid(name)'])
 
     # get queries
     inserts = InsertSqlCreator().create_sql(mapping, diff)
@@ -44,8 +42,8 @@ def test_insert_sql_creator_external_id_unique(books, meta, ir_model_data):
 
     # 'Emma' exists, but with external id '11111'
     diff = pd.DataFrame([
-        ['Emma', '11112'],
-    ], columns=['title', 'bookid(name)[unique=true]'])
+        [0, 'Emma', '11112'],
+    ], columns=['__line__', 'title', 'bookid(name)[unique=true]'])
 
     # get queries
     inserts = InsertSqlCreator().create_sql(mapping, diff)
@@ -66,8 +64,8 @@ def test_update_sql_creator_unmodified_external_id(books, meta):
     mapping = HeaderParser(meta, table_name).parse_csv(header)
 
     diff = pd.DataFrame([
-        ['Pride and Prejudice', 'Joseph Heller', 'Jane Austen'],
-    ], columns=[('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
+        [(0,), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'],
+    ], columns=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
 
     # get queries
     updates = UpdateSqlCreator().create_sql(mapping, diff)
@@ -85,8 +83,8 @@ def test_update_sql_creator_unique_external_id(books, meta):
     mapping = HeaderParser(meta, table_name).parse_csv(header)
 
     diff = pd.DataFrame([
-        ['Pride and Prejudice', 'Joseph Heller', 'Jane Austen', '11111'],
-    ], columns=[('title', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('bookid(name)[unique=true]', '')])
+        [(0,), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen', '11111'],
+    ], columns=['__line__', ('title', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('bookid(name)[unique=true]', '')])
 
     # get queries
     updates = UpdateSqlCreator().create_sql(mapping, diff)

@@ -24,4 +24,4 @@ class DiffToSql:
         update_sql = list(self._update_sql_creator.create_sql(mapping, updates))
         delete_sql = list(self._delete_sql_creator.create_sql(mapping, deletes))
 
-        return insert_sql, update_sql, delete_sql
+        return insert_sql + update_sql + delete_sql

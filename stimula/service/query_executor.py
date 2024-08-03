@@ -1,6 +1,7 @@
 import logging
 import re
 from abc import ABC, abstractmethod
+from enum import Enum
 
 import pandas as pd
 
@@ -10,6 +11,7 @@ In particular, it allows for dependent queries, where the result of the first qu
 '''
 
 _logger = logging.getLogger(__name__)
+
 
 class QueryExecutor(ABC):
     @abstractmethod
@@ -26,7 +28,10 @@ class QueryExecutor(ABC):
 
 
 class SimpleQueryExecutor(QueryExecutor):
-    def __init__(self, query, params):
+    def __init__(self, line_number, operation_type, table_name, query, params):
+        self.line_number = line_number
+        self.operation_type = operation_type
+        self.table_name = table_name
         self.query = query
         self.params = params
 
@@ -38,24 +43,29 @@ class SimpleQueryExecutor(QueryExecutor):
         psycopg_query = self._replace_placeholders(self.query)
         # replace NA values with None in params dictionary
         params_with_none = {k: None if pd.isna(v) else v for k, v in self.params.items()}
-        # execute query
-        cursor.execute(psycopg_query, params_with_none)
+
+        try:
+            # execute query
+            cursor.execute(psycopg_query, params_with_none)
+        except Exception as e:
+            error = str(e)
+            return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self.query, self.params, error)
 
         # Get the number of affected rows
         rowcount = cursor.rowcount
 
         # verify row was inserted
         if rowcount == 0:
-            _logger.warning("No row was inserted. Query: %s, Params: %s" % (self.query, self.params))
-            return (rowcount, self.query, self.params)
+            error = 'No row was inserted'
+            return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, error)
 
         # verify no more than one row was inserted
         if rowcount > 1:
-            # raise exception, bec/ we must not commit the transaction
-            raise ValueError("More than one row was inserted. Inserts: %s, Query: %s, Params: %s" % (rowcount, self.query, self.params))
+            # we must not commit the transaction
+            error = "More than one row was inserted, do not commit."
+            return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, error, True)
 
-
-        result = (rowcount, self.query, self.params)
+        result = ExecutionResult(self.line_number, self.operation_type, True, rowcount, self.table_name, self.query, self.params)
         return result
 
 
@@ -98,3 +108,39 @@ class DependentQueryExecutor(QueryExecutor):
         result = (rowcount, query_0, params_0)
 
         return result
+
+
+class OperationType(Enum):
+    INSERT = "INSERT"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return "'" + self.value + "'"
+
+
+class ExecutionResult:
+    def __init__(self, line_number, operation_type, success, rowcount, table_name, query, params, error=None, block_commit=False):
+        self.line_number = line_number
+        if not isinstance(operation_type, OperationType):
+            raise ValueError(f"operation_type must be an instance of OperationType Enum, not {type(operation_type)}")
+        self.operation_type = operation_type
+        self.success = success
+        self.rowcount = rowcount
+        self.table = table_name
+        self.query = query
+        self.params = params
+        self.error = error
+        self.block_commit = block_commit
+
+    def __str__(self):
+        return f"Type: {self.operation_type}, Success: {self.success}, Rowcount: {self.rowcount}, Table: {self.table_name}, Query: {self.query}, Params: {self.params}"
+
+    def to_dict(instance, execute):
+        if execute:
+            return {key: value for key, value in vars(instance).items() if value is not None and key != 'block_commit'}
+        else:
+            return {key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'success', 'rowcount']}
