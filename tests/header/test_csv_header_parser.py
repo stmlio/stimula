@@ -52,6 +52,16 @@ def test_modifiers(books, lexer, meta):
     assert result == expected
 
 
+def test_modifier_sets(books, lexer, meta):
+    table = 'books'
+    header = 'title[unique=true][x=1: y=2]'
+    result = HeaderParser(meta, table).parse_csv(header)
+    expected = {'table': 'books', 'columns': [
+        {'attributes': [{'name': 'title', 'type': 'text'}], 'unique': True, 'x': '1', 'y': '2', 'enabled': True},
+    ]}
+    assert result == expected
+
+
 def test_quoted_modifiers(books, lexer, meta):
     table = 'books'
     header = 'price[a="$=1": b="$>=2": c="$ like \'%abc%\'"]'

@@ -10,21 +10,26 @@ Email: romke@rnadesign.net
 
 The grammar is as follows:
 
-cell       : columns [ modifiers ]
-           | columns
-           | empty
+cell         : columns modifiersets
+             | columns
+             | empty
 
-columns    : columns : column
-           | column
+columns      : columns : column
+             | column
 
-column     : ID ( columns )
-           | ID
+column       : ID ( columns )
+             | ID
 
-modifiers  : modifiers : modifier
-           | modifier
+modifiersets : modifiersets : modifierset
+             | modifierset
 
-modifier   : ID = ID
-           | ID = VALUE
+modifierset  : [ modifiers ]
+
+modifiers    : modifiers : modifier
+             | modifier
+
+modifier     : ID = ID
+             | ID = VALUE
 
 """
 import csv
@@ -142,9 +147,9 @@ class HeaderParser(Parser):
                         column_type = str(table.columns[a['name']].type).lower()
                         a['type'] = column_type
 
-    @_('columns LBRACK modifiers RBRACK')
+    @_('columns modifiersets')
     def cell(self, p):
-        return {'attributes': p.columns, 'enabled': True, **p.modifiers}
+        return {'attributes': p.columns, 'enabled': True, **p.modifiersets}
 
     @_('columns')
     def cell(self, p):
@@ -197,6 +202,18 @@ class HeaderParser(Parser):
             'name': str(column.key),
             'type': str(column.type).lower()
         }
+
+    @_('modifiersets modifierset')
+    def modifiersets(self, p):
+        return p.modifiersets | p.modifierset
+
+    @_('modifierset')
+    def modifiersets(self, p):
+        return p.modifierset
+
+    @_('LBRACK modifiers RBRACK')
+    def modifierset(self, p):
+        return p.modifiers
 
     @_('modifiers COLON modifier')
     def modifiers(self, p):
