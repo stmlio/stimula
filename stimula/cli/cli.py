@@ -63,19 +63,19 @@ def main():
     parser.add_argument('-p', '--password', help='Password')
     parser.add_argument('-k', '--key', help='Secret key')
     parser.add_argument('-T', '--token', help='Authentication token')
-    parser.add_argument('-t', '--table', help='Table name or filter')
+    parser.add_argument('-t', '--table', nargs='+', help='Table name or filter')
     parser.add_argument('-q', '--query', help='Query clause')
     parser.add_argument('-m', '--mapping', help='Mapping header')
-    parser.add_argument('-f', '--file', help='Path to the file to post', type=argparse.FileType('r'))
+    parser.add_argument('-f', '--file', nargs='+', help='Path to the file to post', type=argparse.FileType('rb'))
     parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
     parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
-    parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='sql')
+    parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
     parser.add_argument('-D', '--deduplicate', action='store_true', help='Deduplicate by unique key')
     parser.add_argument('-v', '--version', action='version', version=version('stimula'))
     parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
     parser.add_argument('-M', '--transpose', action='store_true', help='Transpose the mapping')
     parser.add_argument('-x', '--execute', help='Script to execute on post')
-    parser.add_argument('-c', '--context', help='Free text to match the query results')
+    parser.add_argument('-c', '--context', nargs='+', help='Free text to match the query results')
 
 
     args = parser.parse_args()
@@ -142,48 +142,40 @@ def execute_command(args):
     if args.command == 'auth':
         print(f'Token: {args.token}')
     elif args.command == 'list':
-        tables = invoker.list(args.table)
+        filter = args.table[0] if args.table else None
+        tables = invoker.list(filter)
         # print name and count of tables
         for table in tables:
             print(f'{table["name"]}: {table["count"]}')
     elif args.command == 'mapping':
-        mapping = invoker.mapping(args.table)
+        assert args.table, 'Table name must be provided using -t or --table flag.'
+        mapping = invoker.mapping(args.table[0])
         print(mapping)
     elif args.command == 'count':
-        count = invoker.count(args.table, args.mapping, args.query)
+        assert args.table, 'Table name must be provided using -t or --table flag.'
+        count = invoker.count(args.table[0], args.mapping, args.query)
         print(count)
     elif args.command == 'get':
         assert args.table, 'Table name must be provided using -t or --table flag.'
-        table = invoker.get_table(args.table, args.mapping, args.query)
+        table = invoker.get_table(args.table[0], args.mapping, args.query)
         print(table)
     elif args.command == 'post':
         assert args.table, 'Table name must be provided using -t or --table flag.'
         assert args.enable, 'At least one of the flags I, U, D, E, or C must be enabled. Otherwise, there\'s nothing to do.'
 
-        # read file contents
-        if args.file:
-            with args.file as file:
-                contents = file.read()
-        elif not sys.stdin.isatty():
-            # Input is being piped in
-            contents = sys.stdin.read()
-        else:
-            contents = None
-
         # raise error if no contents are provided
-        assert contents, 'No contents provided, either use --file or -f flag, or pipe data to stdin.'
+        assert (args.file and len(args.file) > 0) or not sys.stdin.isatty(), 'No contents provided, either use --file or -f flag, or pipe data to stdin.'
 
         if args.mapping is None or args.mapping == '':
             assert args.skip > 0, 'No mapping provided and skip is zero. Specify a mapping using the --mapping or -m flag, or provide a file with a header row and --skip > 0.'
             assert not args.transpose, 'Cannot transpose mapping when reading header from data file.'
-            # use first line of contents as mapping
-            args.mapping = contents.splitlines()[0]
+            # leave it to the server to use first line of contents as mapping
 
         # if verbose, print mapping
         if args.verbose:
             print(f'Mapping: {args.mapping}')
 
-        csv = invoker.post_table(args.table, args.mapping, args.query, contents,
+        csv = invoker.post_table(args.table, args.mapping, args.query, args.file,
                                  skiprows=args.skip,
                                  insert='I' in args.enable,
                                  update='U' in args.enable,

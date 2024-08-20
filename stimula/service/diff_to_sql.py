@@ -15,13 +15,13 @@ class DiffToSql:
         self._update_sql_creator = UpdateSqlCreator()
         self._delete_sql_creator = DeleteSqlCreator()
 
-    def diff_sql(self, mapping, diffs):
+    def diff_sql(self, mapping, diffs, context):
         # get from tuple
         inserts, updates, deletes = diffs
 
         # create sql for each diff
-        insert_sql = list(self._insert_sql_creator.create_sql(mapping, inserts))
-        update_sql = list(self._update_sql_creator.create_sql(mapping, updates))
-        delete_sql = list(self._delete_sql_creator.create_sql(mapping, deletes))
+        insert_sql = list(self._insert_sql_creator.create_sql(mapping, inserts, context))
+        update_sql = list(self._update_sql_creator.create_sql(mapping, updates, context))
+        delete_sql = list(self._delete_sql_creator.create_sql(mapping, deletes, context))
 
         return insert_sql + update_sql + delete_sql

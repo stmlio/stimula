@@ -139,9 +139,9 @@ class DB:
         # convert dataframe to csv
         return df.to_csv(index=False, escapechar=escapechar)
 
-    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None):
+    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None, context=None):
         # create diffs and sql
-        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
+        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
         # if execute
         if execute:
             # execute sql statements
@@ -154,9 +154,9 @@ class DB:
 
         return diffs
 
-    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None):
+    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None, context=None):
         # create diffs and sql
-        _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
+        _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
 
         if execute:
             # execute sql statements
@@ -170,27 +170,59 @@ class DB:
     def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False,
                                    post_script=None, context=None):
         # create diffs and sql
-        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script)
+        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
 
         if execute:
             # execute sql statements
             execution_results = self._execute_sql(query_executors, commit)
         else:
-            execution_results = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params) for qe in query_executors]
+            execution_results = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params, context) for qe in query_executors]
 
         # create full report
-        return self._create_post_report(diff, execution_results, execute, commit, context)
+        return self._create_post_report(execution_results, execute, commit)
 
-    def _create_post_report(self, diff, execution_results, execute, commit, context):
-        insert, update, delete = diff
-        found = {'insert': len(insert), 'update': len(update), 'delete': len(delete)}
+    def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False,
+                                             post_script=None, context=None):
+        assert len(table_names) == len(contents), f"Provide exactly one file for each table name, so {len(table_names)}, not {len(contents)}"
+        assert header is None, "Header must be None when posting multiple tables"
+        assert skiprows ==1, "Skiprows must be 1 when posting multiple tables"
+        assert deduplicate == False, "Deduplicate must be False when posting multiple tables"
+        assert post_script is None, "Post script must be None when posting multiple tables"
+        assert context is not None and len(context) == len(table_names), "Provide exactly one context for each table name, not %s" % len(context or [])
+
+        query_executors = []
+
+        # Iterate over tables here.
+        for table_name, file_context, content in zip(table_names, context, contents):
+            # decode binary content
+            text_content = content.decode('utf-8')
+
+            # get header from first line
+            header = text_content.split('\n', 1)[0]
+
+            # create diffs and sql
+            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, deduplicate, post_script, file_context)
+            query_executors.extend(qe)
+
+        if execute:
+            # execute sql statements
+            execution_results = self._execute_sql(query_executors, commit)
+        else:
+            execution_results = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params, file_context) for qe in query_executors]
+
+        # create full report
+        return self._create_post_report(execution_results, execute, commit)
+
+    def _create_post_report(self, execution_results, execute, commit):
+        insert = len([er for er in execution_results if er.operation_type == OperationType.INSERT])
+        update = len([er for er in execution_results if er.operation_type == OperationType.UPDATE])
+        delete = len([er for er in execution_results if er.operation_type == OperationType.DELETE])
+
+        found = {'insert': insert, 'update': update, 'delete': delete}
 
         summary = {'found': found, 'execute': execute, 'commit': commit}
 
         result = {'summary': summary}
-
-        if context:
-            result['context'] = context
 
         # only set success & failed if execute is True
         if execute:
@@ -250,7 +282,7 @@ class DB:
 
             return result
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script):
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context):
         # get cnx from context
         cnx = cnx_context.cnx
 
@@ -267,7 +299,7 @@ class DB:
         diffs = self._compare(df_request, df_db, insert, update, delete)
 
         # create sql statements and parameters
-        sqls = self._diff_to_sql.diff_sql(mapping, diffs)
+        sqls = self._diff_to_sql.diff_sql(mapping, diffs, context)
 
         return diffs, sqls
 
@@ -492,11 +524,11 @@ class DB:
         return inserts if insert else DataFrame(), updates if update else DataFrame(), deletes if delete else DataFrame()
 
     def _move_line_to_front(self, df):
-        # move __line__ to become the left most column. This has no real function, but it makes the dataframes more readable
+        # move __line__ to become the left most column. This has no real purpose, but it makes the dataframes more readable
          # this must also work with the multi-index dataframes coming from the compare function
         # get __line__ column as a series
         line = df['__line__']
-        # drop __line__ column
+        # drop __line__ column, use level parameter to improve performance
         df = df.drop(columns=['__line__'])
         # insert __line__ column as first column
         df.insert(0, '__line__', line)
@@ -560,14 +592,8 @@ class DB:
         # get cursor from context
         cr = cnx_context.cr
 
-        result = []
-
-        # iterate query executors
-        for query_executor in query_executors:
-            # delegate execution to query executor
-            execution_result = query_executor.execute(cr)
-            # append result to list
-            result.append(execution_result)
+        # execute queries, rerun until exhausted
+        result = self._eat_sleep_repeat(query_executors, cr)
 
         # commit if requested
         if commit:
@@ -580,12 +606,66 @@ class DB:
 
         return result
 
+    def _eat_sleep_repeat(self, query_executors, cr):
+        # execute in rounds until no new successful queries are found
+
+        # create result lists
+        completed = []
+        failed = []
+
+        # copy query executors list
+        remaining = query_executors.copy()
+
+        done = False
+
+        while not done:
+            new_completed_executors = []
+            new_completed_results = []
+            # iterate query executors
+            for query_executor in remaining:
+                # create or replace savepoint
+                self.create_savepoint()
+                # delegate execution to query executor
+                execution_result = query_executor.execute(cr)
+                # if successful
+                if execution_result.success:
+                    # append result to list
+                    new_completed_results.append(execution_result)
+                    # remove from remaining
+                    new_completed_executors.append(query_executor)
+                else:
+                    # rollback to savepoint
+                    self.rollback_to_savepoint()
+                    # append to failed list
+                    failed.append(execution_result)
+            if new_completed_results:
+                # append new completed to completed list
+                completed.extend(new_completed_results)
+                # remove completed executors from remaining
+                remaining = [qe for qe in remaining if qe not in new_completed_executors]
+                # reset failed list and start again
+                failed = []
+            else:
+                # nothing new completed, we're done
+                done = True
+        # return completed and failed lists
+        return completed + failed
+
+
     def set_context(self, url, password):
         # create psycopg2 connection
         cnx = psycopg2.connect(url, password=password)
         # set connection and cursor in context
         cnx_context.cnx = cnx
         cnx_context.cr = cnx.cursor()
+
+    def create_savepoint(self):
+        # create savepoint
+        cnx_context.cr.execute("SAVEPOINT stimula_savepoint")
+
+    def rollback_to_savepoint(self):
+        # rollback to savepoint
+        cnx_context.cr.execute("ROLLBACK TO SAVEPOINT stimula_savepoint")
 
     def _replace_empty_columns_with_skip(self, column_names):
         # replace empty column names with skip, skip1, skip2. This is because pandas doesn't like empty column names

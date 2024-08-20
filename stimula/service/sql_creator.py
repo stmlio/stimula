@@ -39,7 +39,7 @@ class SqlCreator:
         self._values_lexer = ValuesLexer()
         self._values_parser = ValuesParser()
 
-    def create_sql(self, mapping, diffs):
+    def create_sql(self, mapping, diffs, context):
         # add alias and parameter names to mapping
         aliased_mapping = AliasCompiler().compile(mapping)
 
@@ -54,7 +54,7 @@ class SqlCreator:
             line_number = self._get_line_number(row)
 
             # yield query and split columns
-            yield SimpleQueryExecutor(line_number, operation_type, aliased_mapping['table'], query, value_dict)
+            yield SimpleQueryExecutor(line_number, operation_type, aliased_mapping['table'], query, value_dict, context)
 
     def _create_sql_row(self, mapping, row):
         # Create a dictionary with unique column headers as keys and values as values. We'll need these for all query types.
@@ -194,9 +194,9 @@ class SqlCreator:
 
 class InsertSqlCreator(SqlCreator):
 
-    def create_sql(self, mapping, diffs):
+    def create_sql(self, mapping, diffs, context):
         # override to create dependent insert queries for extensions
-        for query_executor in super().create_sql(mapping, diffs):
+        for query_executor in super().create_sql(mapping, diffs, context):
 
             # is there an extension on the root table?
             if not ReturningClauseCompiler().compile(mapping):
@@ -331,7 +331,7 @@ class UpdateSqlCreator(SqlCreator):
 
     def _get_line_number(self, row):
         # for updates, the column contains Series, not sure how to change that
-        return row['__line__'][0]
+        return row['__line__'].iloc[0]
 
 
 class DeleteSqlCreator(SqlCreator):

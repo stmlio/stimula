@@ -425,30 +425,29 @@ def test_post_table_get_full_report(db, books, context):
     '''
     full_report = db.post_table_get_full_report('books', 'title[unique=true], authorid(name)', None, body, insert=True, update=True, delete=True, execute=True, context='my table')
     expected = {
-        'context': 'my table',
         'summary': {
             'execute': True, 'commit': False,
             'found': {'insert': 2, 'update': 3, 'delete': 1},
             'success': {'insert': 2, 'update': 2, 'delete': 1},
             'failed': {'insert': 0, 'update': 1, 'delete': 0}
         }, 'rows': [
-            {'line_number': 2, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books',
+            {'line_number': 2, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
              'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
              'params': {'title': 'Catch XIII', 'name': 'Joseph Heller'}},
-            {'line_number': 6, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books',
+            {'line_number': 6, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
              'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
              'params': {'title': 'A Christmas Carol', 'name': 'Charles Dickens'}},
-            {'line_number': 1, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books',
+            {'line_number': 1, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'title': 'War and Peace', 'name': 'Jane Austen'}},
-            {'line_number': 3, 'operation_type': OperationType.UPDATE, 'success': False, 'rowcount': 0, 'table': 'books',
+            {'line_number': 3, 'operation_type': OperationType.UPDATE, 'success': False, 'rowcount': 0, 'table': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'name': 'Charlie Dickens', 'title': 'David Copperfield'},
              'error': 'No row was inserted'},
-            {'line_number': 5, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books',
+            {'line_number': 5, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'title': 'Anna Karenina', 'name': 'Joseph Heller'}},
-            {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table': 'books',
+            {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
              'query': 'delete from books where books.title = :title',
              'params': {'title': 'Catch-22'}}
         ]}

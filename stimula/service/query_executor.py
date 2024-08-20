@@ -28,12 +28,13 @@ class QueryExecutor(ABC):
 
 
 class SimpleQueryExecutor(QueryExecutor):
-    def __init__(self, line_number, operation_type, table_name, query, params):
+    def __init__(self, line_number, operation_type, table_name, query, params, context):
         self.line_number = line_number
         self.operation_type = operation_type
         self.table_name = table_name
         self.query = query
         self.params = params
+        self.context = context
 
     def queries(self):
         return [(self.query, self.params)]
@@ -49,7 +50,7 @@ class SimpleQueryExecutor(QueryExecutor):
             cursor.execute(psycopg_query, params_with_none)
         except Exception as e:
             error = str(e)
-            return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self.query, self.params, error)
+            return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self.query, self.params, self.context, error=error)
 
         # Get the number of affected rows
         rowcount = cursor.rowcount
@@ -57,15 +58,15 @@ class SimpleQueryExecutor(QueryExecutor):
         # verify row was inserted
         if rowcount == 0:
             error = 'No row was inserted'
-            return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, error)
+            return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, self.context, error=error)
 
         # verify no more than one row was inserted
         if rowcount > 1:
             # we must not commit the transaction
             error = "More than one row was inserted, do not commit."
-            return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, error, True)
+            return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, self.context, error, True)
 
-        result = ExecutionResult(self.line_number, self.operation_type, True, rowcount, self.table_name, self.query, self.params)
+        result = ExecutionResult(self.line_number, self.operation_type, True, rowcount, self.table_name, self.query, self.params, self.context)
         return result
 
 
@@ -123,7 +124,7 @@ class OperationType(Enum):
 
 
 class ExecutionResult:
-    def __init__(self, line_number, operation_type, success, rowcount, table_name, query, params, error=None, block_commit=False):
+    def __init__(self, line_number, operation_type, success, rowcount, table_name, query, params, context, error=None, block_commit=False):
         self.line_number = line_number
         if not isinstance(operation_type, OperationType):
             raise ValueError(f"operation_type must be an instance of OperationType Enum, not {type(operation_type)}")
@@ -133,6 +134,7 @@ class ExecutionResult:
         self.table = table_name
         self.query = query
         self.params = params
+        self.context = context
         self.error = error
         self.block_commit = block_commit
 
