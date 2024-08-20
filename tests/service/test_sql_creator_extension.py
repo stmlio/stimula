@@ -64,7 +64,7 @@ def test_update_sql_creator_unmodified_external_id(books, meta):
     mapping = HeaderParser(meta, table_name).parse_csv(header)
 
     diff = pd.DataFrame([
-        [(0,), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'],
+        [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'],
     ], columns=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
 
     # get queries
@@ -83,7 +83,7 @@ def test_update_sql_creator_unique_external_id(books, meta):
     mapping = HeaderParser(meta, table_name).parse_csv(header)
 
     diff = pd.DataFrame([
-        [(0,), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen', '11111'],
+        [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen', '11111'],
     ], columns=['__line__', ('title', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('bookid(name)[unique=true]', '')])
 
     # get queries

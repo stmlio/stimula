@@ -15,7 +15,7 @@ def test_diff_sql(books, meta, lexer):
     ],
         columns=['title[unique=true]', '__line__', 'authorid(name)'])
     updates = pd.DataFrame([
-        ['Pride and Prejudice', (1,), 'Joseph Heller', 'Jane Austen'],
+        ['Pride and Prejudice', pd.Series([1]), 'Joseph Heller', 'Jane Austen'],
     ],
         columns=[('title[unique=true]', ''), '__line__', ('authorid(name)', 'self'), ('authorid(name)', 'other')])
     deletes = pd.DataFrame([

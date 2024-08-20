@@ -162,7 +162,7 @@ class DB:
             # execute sql statements
             sqls = self._execute_sql(query_executors, commit)
         else:
-            sqls = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params) for qe in query_executors]
+            sqls = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params, context) for qe in query_executors]
 
         # convert sql to dataframe
         return self._convert_to_df(sqls, execute)

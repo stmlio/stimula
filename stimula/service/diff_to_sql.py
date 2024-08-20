@@ -15,7 +15,7 @@ class DiffToSql:
         self._update_sql_creator = UpdateSqlCreator()
         self._delete_sql_creator = DeleteSqlCreator()
 
-    def diff_sql(self, mapping, diffs, context):
+    def diff_sql(self, mapping, diffs, context=None):
         # get from tuple
         inserts, updates, deletes = diffs
 

@@ -245,12 +245,12 @@ def test_post_table_update_with_missing_unique_column(db, books, context):
 def test_execute_sql_no_commit(db, books, context):
     sql = [
         SimpleQueryExecutor(0, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-                            {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
+                            {'title': 'Catch XIII', 'name': 'Joseph Heller'}, 'books.csv'),
         SimpleQueryExecutor(1, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-                            {'title': 'Witches', 'name': 'Charles Dickens'}),
+                            {'title': 'Witches', 'name': 'Charles Dickens'}, 'books.csv'),
         SimpleQueryExecutor(2, OperationType.UPDATE, 'books', 'update books set authorid = authors.author_id from authors where title = :title and authors.name = :name',
-                            {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
-        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'})
+                            {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}, 'books.csv'),
+        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'}, 'books.csv' )
     ]
     result = db._execute_sql(sql)
 
@@ -262,12 +262,12 @@ def test_execute_sql_no_commit(db, books, context):
 def test_execute_sql_with_commit(db, books, context):
     sql = [
         SimpleQueryExecutor(0, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-                            {'title': 'Catch XIII', 'name': 'Joseph Heller'}),
+                            {'title': 'Catch XIII', 'name': 'Joseph Heller'}, 'books.csv'),
         SimpleQueryExecutor(1, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-                            {'title': 'Witches', 'name': 'Charles Dickens'}),
+                            {'title': 'Witches', 'name': 'Charles Dickens'}, 'books.csv'),
         SimpleQueryExecutor(2, OperationType.UPDATE, 'books', 'update books set authorid = authors.author_id from authors where title = :title and authors.name = :name',
-                            {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}),
-        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'})
+                            {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}, 'books.csv'),
+        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'}, 'books.csv')
     ]
     result = db._execute_sql(sql, commit=True)
     rowcounts = [er.rowcount for er in result]
@@ -424,6 +424,10 @@ def test_post_table_get_full_report(db, books, context):
         A Christmas Carol, Charles Dickens
     '''
     full_report = db.post_table_get_full_report('books', 'title[unique=true], authorid(name)', None, body, insert=True, update=True, delete=True, execute=True, context='my table')
+
+    # sort rows by line number
+    full_report['rows'] = sorted(full_report['rows'], key=lambda x: x.get('line_number', 0))
+
     expected = {
         'summary': {
             'execute': True, 'commit': False,
@@ -431,15 +435,15 @@ def test_post_table_get_full_report(db, books, context):
             'success': {'insert': 2, 'update': 2, 'delete': 1},
             'failed': {'insert': 0, 'update': 1, 'delete': 0}
         }, 'rows': [
-            {'line_number': 2, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
-             'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-             'params': {'title': 'Catch XIII', 'name': 'Joseph Heller'}},
-            {'line_number': 6, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
-             'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-             'params': {'title': 'A Christmas Carol', 'name': 'Charles Dickens'}},
+            {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
+             'query': 'delete from books where books.title = :title',
+             'params': {'title': 'Catch-22'}},
             {'line_number': 1, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'title': 'War and Peace', 'name': 'Jane Austen'}},
+            {'line_number': 2, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
+             'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+             'params': {'title': 'Catch XIII', 'name': 'Joseph Heller'}},
             {'line_number': 3, 'operation_type': OperationType.UPDATE, 'success': False, 'rowcount': 0, 'table': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'name': 'Charlie Dickens', 'title': 'David Copperfield'},
@@ -447,9 +451,9 @@ def test_post_table_get_full_report(db, books, context):
             {'line_number': 5, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'title': 'Anna Karenina', 'name': 'Joseph Heller'}},
-            {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
-             'query': 'delete from books where books.title = :title',
-             'params': {'title': 'Catch-22'}}
+            {'line_number': 6, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'my table',
+             'query': 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
+             'params': {'title': 'A Christmas Carol', 'name': 'Charles Dickens'}},
         ]}
 
     assert full_report == expected

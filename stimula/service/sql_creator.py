@@ -39,7 +39,7 @@ class SqlCreator:
         self._values_lexer = ValuesLexer()
         self._values_parser = ValuesParser()
 
-    def create_sql(self, mapping, diffs, context):
+    def create_sql(self, mapping, diffs, context=None):
         # add alias and parameter names to mapping
         aliased_mapping = AliasCompiler().compile(mapping)
 
@@ -194,7 +194,7 @@ class SqlCreator:
 
 class InsertSqlCreator(SqlCreator):
 
-    def create_sql(self, mapping, diffs, context):
+    def create_sql(self, mapping, diffs, context=None):
         # override to create dependent insert queries for extensions
         for query_executor in super().create_sql(mapping, diffs, context):
 

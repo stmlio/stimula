@@ -20,7 +20,7 @@ def test_create_sql(meta, books, lexer):
     result = list(InsertSqlCreator().create_sql(mapping, inserts))
 
     expected = ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
-                 {'title': 'Pride and Prejudice', 'name': 'Jane Austen'})
+                {'title': 'Pride and Prejudice', 'name': 'Jane Austen'})
     assert result[0].query, result[0].params == expected
 
 
@@ -29,13 +29,13 @@ def test_create_sql_multiple_update_rows(meta, books, lexer):
     header = 'title[unique=true], authorid(name), description'
     mapping = HeaderParser(meta, 'books').parse_csv(header)
     # create multi index series with self/other columns
-    # columns = ['__line__'] + pd.MultiIndex.from_tuples([('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')])
+    columns = ['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')]
 
     updates = pd.DataFrame([
-        [(0,), 'Pride and Prejudice', 'Charles Dickens', 'Jane Austen', NaN, NaN],
-        [(1,), 'David Copperfield', NaN, NaN, 'A novel by Charles Dickens, narrated by ...', NaN],
+        [pd.Series([0]), 'Pride and Prejudice', 'Charles Dickens', 'Jane Austen', NaN, NaN],
+        [pd.Series([1]), 'David Copperfield', NaN, NaN, 'A novel by Charles Dickens, narrated by ...', NaN],
     ],
-        columns=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')]
+        columns=columns
     )
     updates = list(UpdateSqlCreator().create_sql(mapping, updates))
 
@@ -64,7 +64,7 @@ def test_create_sql_row_insert_skip_empty_column(books, meta, lexer):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
-    row = pd.Series( [0, 'Pride and Prejudice', ''], index=['__line__', 'title[unique=true]', 'authorid(name)'])
+    row = pd.Series([0, 'Pride and Prejudice', ''], index=['__line__', 'title[unique=true]', 'authorid(name)'])
     result = InsertSqlCreator()._create_sql_row(mapping, row)
 
     expected = (OperationType.INSERT, 'insert into books(title) select :title', {'title': 'Pride and Prejudice'})
