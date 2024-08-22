@@ -137,6 +137,11 @@ class HeaderParser(Parser):
                     foreign_key['qualifier'] = modifiers['qualifier']
                     del modifiers['qualifier']
 
+                    # there may be an optional id attribute in the cell as well, move it to the attribute
+                    if 'id' in modifiers:
+                        foreign_key['id'] = modifiers['id']
+                        del modifiers['id']
+
                     # mark the foreign key as extension
                     foreign_key['extension'] = True
 

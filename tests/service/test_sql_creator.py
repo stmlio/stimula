@@ -10,8 +10,9 @@ from stimula.service.sql_creator import SqlCreator, InsertSqlCreator, UpdateSqlC
 
 
 def test_create_sql(meta, books, lexer):
+    table = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
+    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     inserts = pd.DataFrame([
         ['Pride and Prejudice', 0, 'Jane Austen'],
     ],
@@ -26,8 +27,9 @@ def test_create_sql(meta, books, lexer):
 
 def test_create_sql_multiple_update_rows(meta, books, lexer):
     # verify that it can create multiple rows with different columns
+    table = 'books'
     header = 'title[unique=true], authorid(name), description'
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
+    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     # create multi index series with self/other columns
     columns = ['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')]
 

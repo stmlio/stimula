@@ -14,8 +14,21 @@ _logger = logging.getLogger(__name__)
 
 
 class QueryExecutor(ABC):
+    def __init__(self, line_number, operation_type, table_name, context):
+        self.line_number = line_number
+        self.operation_type = operation_type
+        self.table_name = table_name
+        self.context = context
+
     @abstractmethod
     def execute(self, cursor):
+        pass
+
+    '''
+    Called when user sets execute=False. Purpose is to inspect the queries and parameters that would be executed.
+    '''
+    @abstractmethod
+    def fake_execute(self):
         pass
 
     @abstractmethod
@@ -29,12 +42,9 @@ class QueryExecutor(ABC):
 
 class SimpleQueryExecutor(QueryExecutor):
     def __init__(self, line_number, operation_type, table_name, query, params, context):
-        self.line_number = line_number
-        self.operation_type = operation_type
-        self.table_name = table_name
+        super().__init__(line_number, operation_type, table_name, context)
         self.query = query
         self.params = params
-        self.context = context
 
     def queries(self):
         return [(self.query, self.params)]
@@ -69,12 +79,20 @@ class SimpleQueryExecutor(QueryExecutor):
         result = ExecutionResult(self.line_number, self.operation_type, True, rowcount, self.table_name, self.query, self.params, self.context)
         return result
 
+    def fake_execute(self):
+        return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self.query, self.params, self.context)
 
+'''
+This class allows for dependent queries, where the result of the first query is used as a parameter in the second query.
+This is useful for extensions, such as the ir_model_data table in Odoo.
+'''
 class DependentQueryExecutor(QueryExecutor):
-    def __init__(self, initial_query, dependent_query):
+    def __init__(self, line_number, operation_type, table_name, context, initial_query, dependent_query):
+        super().__init__(line_number, operation_type, table_name, context)
         self.query = initial_query[0]
         self.params = initial_query[1]
         self.dependent_query = dependent_query
+
 
     def queries(self):
         return [(self.query, self.params), self.dependent_query]
@@ -88,27 +106,40 @@ class DependentQueryExecutor(QueryExecutor):
 
         cursor.execute(query_0, params_0)
         result = cursor.fetchone()
-        rowcount = cursor.rowcount
+        rowcount_0 = cursor.rowcount
 
         # verify row was inserted
-        if rowcount == 0:
+        if rowcount_0 == 0:
             _logger.warning("No row was inserted. Query: %s, Params: %s" % (query_0, params_0))
-            return (rowcount, query_0, params_0)
+            return (rowcount_0, query_0, params_0)
 
         # verify no more than one row was inserted
-        if rowcount > 1:
+        if rowcount_0 > 1:
             # raise exception, bec/ we must not commit the transaction
-            raise ValueError("More than one row was inserted. Inserts: %s, Query: %s, Params: %s" % (rowcount, query_0, params_0))
+            raise ValueError("More than one row was inserted. Inserts: %s, Query: %s, Params: %s" % (rowcount_0, query_0, params_0))
+
+        execution_result = ExecutionResult(self.line_number, self.operation_type, True, rowcount_0, self.table_name, self.query, params_0, self.context)
 
         # replace ':' style place holders with '%' style
-        query_1 = self._replace_placeholders(self.dependent_query[0])
+        query_1 = self.dependent_query[0]
         params_1 = self.dependent_query[1]
         params_1['res_id'] = result[0]
 
-        cursor.execute(query_1, params_1)
-        result = (rowcount, query_0, params_0)
+        cursor.execute(self._replace_placeholders(query_1), params_1)
+        rowcount_1 = cursor.rowcount
 
-        return result
+        # creaet execution result of dependent query
+        dependent_execution_result = ExecutionResult(self.line_number, self.operation_type, True, rowcount_1, self.table_name, query_1, params_1, self.context)
+        execution_result.dependent_execution_result = dependent_execution_result
+
+        return execution_result
+
+    def fake_execute(self):
+        execution_result = ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self.query, self.params, self.context)
+        dependent_execution_result = ExecutionResult(self.line_number, self.operation_type, True, 0, self.table_name, self.dependent_query[0], self.dependent_query[1], self.context)
+        execution_result.dependent_execution_result = dependent_execution_result
+        return execution_result
+
 
 
 class OperationType(Enum):
@@ -137,6 +168,7 @@ class ExecutionResult:
         self.context = context
         self.error = error
         self.block_commit = block_commit
+        self.dependent_execution_result = None
 
     def __str__(self):
         return f"Type: {self.operation_type}, Success: {self.success}, Rowcount: {self.rowcount}, Table: {self.table_name}, Query: {self.query}, Params: {self.params}"

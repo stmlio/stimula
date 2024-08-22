@@ -145,7 +145,7 @@ class DB:
         # if execute
         if execute:
             # execute sql statements
-            results_tuple = self._execute_sql(sql, commit)
+            results_tuple = self._execute_sql(sql, True, commit)
             # concatenate results
             results = [result for results in results_tuple for result in results]
             # zip row counts with diffs statements
@@ -158,11 +158,8 @@ class DB:
         # create diffs and sql
         _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
 
-        if execute:
-            # execute sql statements
-            sqls = self._execute_sql(query_executors, commit)
-        else:
-            sqls = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params, context) for qe in query_executors]
+        # execute sql statements, or fake if execute is false
+        sqls = self._execute_sql(query_executors, execute, commit)
 
         # convert sql to dataframe
         return self._convert_to_df(sqls, execute)
@@ -172,11 +169,8 @@ class DB:
         # create diffs and sql
         diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
 
-        if execute:
-            # execute sql statements
-            execution_results = self._execute_sql(query_executors, commit)
-        else:
-            execution_results = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params, context) for qe in query_executors]
+        # execute sql statements
+        execution_results = self._execute_sql(query_executors, execute, commit)
 
         # create full report
         return self._create_post_report(execution_results, execute, commit)
@@ -204,11 +198,8 @@ class DB:
             _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, deduplicate, post_script, file_context)
             query_executors.extend(qe)
 
-        if execute:
-            # execute sql statements
-            execution_results = self._execute_sql(query_executors, commit)
-        else:
-            execution_results = [ExecutionResult(qe.line_number, qe.operation_type, False, 0, table_name, qe.query, qe.params, file_context) for qe in query_executors]
+        # execute sql statements
+        execution_results = self._execute_sql(query_executors, execute, commit)
 
         # create full report
         return self._create_post_report(execution_results, execute, commit)
@@ -259,6 +250,15 @@ class DB:
             # append a new row to the bottom result with values from value dictionary using concat
             result = pd.concat([result, pd.DataFrame(value_dict, index=[index])], ignore_index=True)
             index += 1
+
+            # append dependent query result
+            dep_er = er.dependent_execution_result
+            if dep_er:
+                value_dict = {**dep_er.params, 'sql': dep_er.query}
+                if showResult:
+                    value_dict = {**value_dict, 'rows': dep_er.rowcount}
+                result = pd.concat([result, pd.DataFrame(value_dict, index=[index])], ignore_index=True)
+                index += 1
 
         # force pandas to not convert int columns to float if they contain NaNs
         result = result.convert_dtypes()
@@ -588,7 +588,11 @@ class DB:
 
         return merged_mapping
 
-    def _execute_sql(self, query_executors, commit=False):
+    def _execute_sql(self, query_executors, execute, commit):
+        if not execute:
+            # fake execution, return result
+            return [qe.fake_execute() for qe in query_executors]
+
         # get cursor from context
         cr = cnx_context.cr
 

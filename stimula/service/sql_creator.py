@@ -24,7 +24,6 @@ import pandas as pd
 from psycopg2._json import Json
 
 from .query_executor import SimpleQueryExecutor, DependentQueryExecutor, OperationType
-from ..compiler.alias_compiler import AliasCompiler
 from ..compiler.delete_compiler import DeleteCompiler
 from ..compiler.header_compiler import HeaderCompiler
 from ..compiler.insert_compiler import InsertCompiler, ReturningClauseCompiler
@@ -40,21 +39,19 @@ class SqlCreator:
         self._values_parser = ValuesParser()
 
     def create_sql(self, mapping, diffs, context=None):
-        # add alias and parameter names to mapping
-        aliased_mapping = AliasCompiler().compile(mapping)
 
         # iterate rows in diff
         for i in range(len(diffs)):
             row = diffs.iloc[i]
 
             # create query for row
-            operation_type, query, value_dict = self._create_sql_row(aliased_mapping, row)
+            operation_type, query, value_dict = self._create_sql_row(mapping, row)
 
             # return line number, depends on operation type
             line_number = self._get_line_number(row)
 
             # yield query and split columns
-            yield SimpleQueryExecutor(line_number, operation_type, aliased_mapping['table'], query, value_dict, context)
+            yield SimpleQueryExecutor(line_number, operation_type, mapping['table'], query, value_dict, context)
 
     def _create_sql_row(self, mapping, row):
         # Create a dictionary with unique column headers as keys and values as values. We'll need these for all query types.
@@ -206,7 +203,7 @@ class InsertSqlCreator(SqlCreator):
 
                 # create a separate query for the extension
                 dependent_query = self._create_extension_insert_query(mapping, query_executor.params)
-                dependent_query_executor = DependentQueryExecutor((query_executor.query, query_executor.params), dependent_query)
+                dependent_query_executor = DependentQueryExecutor(query_executor.line_number, query_executor.operation_type, mapping['table'], context, (query_executor.query, query_executor.params), dependent_query)
                 yield dependent_query_executor
 
     def _create_non_unique_value_dict(self, mapping, row):
@@ -231,17 +228,22 @@ class InsertSqlCreator(SqlCreator):
 
         # only one extension is supported for now
         assert len(extension_foreign_keys) == 1, f'Only one extension is supported, found: {len(extension_foreign_keys)}'
-
         foreign_key = extension_foreign_keys[0]
+
+        # foreign key must have a single attribute
+        assert len(foreign_key['attributes']) == 1, f'Foreign key must have a single attribute, found: {len(foreign_key["attributes"])}'
+        attribute = foreign_key['attributes'][0]
+        name_parameter_name = attribute['parameter']
+
         table = foreign_key['table']
-        name = param['name']
+        name = param[name_parameter_name]
         qualifier = foreign_key['qualifier']
         # TODO: replace with proper way to get the model name
         model = mapping['table'].replace('_', '.')
         # create query
 
-        sql = f'insert into {table} (name, module, model, res_id) values (:name, :module, :model, :res_id)'
-        values = {'name': name, 'module': qualifier, 'model': model, 'res_id': None}
+        sql = f'insert into {table} (name, module, model, res_id) values (:{name_parameter_name}, :module, :model, :res_id)'
+        values = {name_parameter_name: name, 'module': qualifier, 'model': model, 'res_id': None}
         return sql, values
 
     def _get_line_number(self, row):

@@ -18,11 +18,10 @@ class UpdateCompiler:
     """
 
     def compile(self, mapping):
-        aliased_mapping = AliasCompiler().compile(mapping)
-        update_clause = UpdateClauseCompiler().compile(aliased_mapping)
-        from_clause = FromClauseCompiler(False).compile(aliased_mapping)
-        where_clause = WhereClauseCompiler().compile(aliased_mapping)
-        foreign_where_clause = ForeignWhereClauseCompiler(False).compile(aliased_mapping)
+        update_clause = UpdateClauseCompiler().compile(mapping)
+        from_clause = FromClauseCompiler(False).compile(mapping)
+        where_clause = WhereClauseCompiler().compile(mapping)
+        foreign_where_clause = ForeignWhereClauseCompiler(False).compile(mapping)
 
         result = f'{update_clause}{from_clause}{where_clause}'
         if foreign_where_clause:

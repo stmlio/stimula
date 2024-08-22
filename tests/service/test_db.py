@@ -252,7 +252,7 @@ def test_execute_sql_no_commit(db, books, context):
                             {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}, 'books.csv'),
         SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'}, 'books.csv' )
     ]
-    result = db._execute_sql(sql)
+    result = db._execute_sql(sql, True, False)
 
     rowcounts = [er.rowcount for er in result]
     expected = [1, 1, 1, 1]
@@ -269,7 +269,7 @@ def test_execute_sql_with_commit(db, books, context):
                             {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}, 'books.csv'),
         SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'}, 'books.csv')
     ]
-    result = db._execute_sql(sql, commit=True)
+    result = db._execute_sql(sql, True, True)
     rowcounts = [er.rowcount for er in result]
     expected = [1, 1, 1, 1]
     assert rowcounts == expected

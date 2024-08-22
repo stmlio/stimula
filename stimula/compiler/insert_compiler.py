@@ -223,10 +223,18 @@ class ReturningClauseCompiler:
     # returns 'returning id' if this mapping contains an extension relation on the root table
 
     def compile(self, mapping):
+        # get list of returned columns
         clauses = chain(*[self._column(c) for c in mapping['columns']])
-        if not any([c for c in clauses if c]):
+        # filter out all empty clauses
+        non_empty_clauses = [c for c in clauses if c]
+
+        if not any(non_empty_clauses):
             return ''
-        return ' returning id'
+
+        # assert there's no more than one
+        assert len(non_empty_clauses) == 1, f'Can only return a single extension id, found: {non_empty_clauses}'
+
+        return ' returning ' + non_empty_clauses[0]
 
     def _column(self, column):
         return self._attributes(column.get('attributes', []))
@@ -235,4 +243,12 @@ class ReturningClauseCompiler:
         return [self._attribute(attribute) for attribute in attributes]
 
     def _attribute(self, attribute):
-        return 'foreign-key' in attribute and attribute['foreign-key'].get('extension', False)
+        if not 'foreign-key' in attribute:
+            # not a foreign key relationship, so not an extension
+            return None
+        if not attribute['foreign-key'].get('extension', False):
+            # not an extension foreign key
+            return None
+        # extension, so return the id to return from the query. Default to 'id' bec/ that's what Odoo uses
+        return attribute['foreign-key'].get('id', 'id')
+

@@ -6,6 +6,7 @@ Email: romke@rnadesign.net
 """
 
 from .sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
+from ..compiler.alias_compiler import AliasCompiler
 
 
 class DiffToSql:
@@ -19,9 +20,12 @@ class DiffToSql:
         # get from tuple
         inserts, updates, deletes = diffs
 
+        # add alias and parameter names to mapping before creating sql
+        aliased_mapping = AliasCompiler().compile(mapping)
+
         # create sql for each diff
-        insert_sql = list(self._insert_sql_creator.create_sql(mapping, inserts, context))
-        update_sql = list(self._update_sql_creator.create_sql(mapping, updates, context))
-        delete_sql = list(self._delete_sql_creator.create_sql(mapping, deletes, context))
+        insert_sql = list(self._insert_sql_creator.create_sql(aliased_mapping, inserts, context))
+        update_sql = list(self._update_sql_creator.create_sql(aliased_mapping, updates, context))
+        delete_sql = list(self._delete_sql_creator.create_sql(aliased_mapping, deletes, context))
 
         return insert_sql + update_sql + delete_sql

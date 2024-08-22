@@ -28,13 +28,12 @@ class SelectCompiler:
         :return: the select query
         """
         table = mapping['table']
-        aliased_mapping = AliasCompiler().compile(mapping)
-        select_clause = SelectClauseCompiler().compile(aliased_mapping)
-        join_clause = JoinClauseCompiler().compile(aliased_mapping)
-        order_by_clause = OrderByClauseCompiler().compile(aliased_mapping)
+        select_clause = SelectClauseCompiler().compile(mapping)
+        join_clause = JoinClauseCompiler().compile(mapping)
+        order_by_clause = OrderByClauseCompiler().compile(mapping)
 
         # compile [filter="...$..."] headers into a where clause, replacing '$' with the column name
-        where = WhereClauseCompiler().compile(aliased_mapping, where_clause)
+        where = WhereClauseCompiler().compile(mapping, where_clause)
         return f'{select_clause} from {table}{join_clause}{where}{order_by_clause}'
 
     def compile_count_query(self, mapping, where_clause=None):
