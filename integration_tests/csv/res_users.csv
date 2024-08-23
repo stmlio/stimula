@@ -1,0 +1,3 @@
+login[unique=true],active,company_id(name),partner_id(email),notification_type
+user 1,True,My Company (San Francisco),user1@example.com,email
+user 2,True,My Company (San Francisco),user2@example.com,email

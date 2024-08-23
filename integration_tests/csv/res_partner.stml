@@ -1,0 +1,20 @@
+@source,res_partner.csv,,,
+@target,res_partner,,,
+,,,,
+source_column,target_column,unique,default-value,
+active,"",,,TRUE
+company_id(name),company_id(name),,,My Company (San Francisco)
+company_name,company_name,,,My Company (San Francisco)
+complete_name,complete_name,,,"YourCompany, User One"
+country_id(code),country_id(code),,,US
+email[unique=true],email,true,,user1@example.com
+function,function,,,Chief Operations Officer (COO)
+is_company,is_company,,,FALSE
+lang,lang,,,en_US
+name,name,,,User One
+parent_id(id),parent_id(id),,,1
+partner_share,partner_share,,,TRUE
+state_id(country_id(code):code),state_id(country_id(code):code),,,US:CA
+street,street,,,"250 Executive Park Blvd, Suite 3400"
+type,type,,,contact
+,active,,true,

@@ -1,0 +1,3 @@
+active,company_id(name),company_name,complete_name,country_id(code),email[unique=true],function,is_company,lang,name,parent_id(id),partner_share,state_id(country_id(code):code),street,type
+True,My Company (San Francisco),My Company (San Francisco),"YourCompany, User One",US,user1@example.com,Chief Operations Officer (COO),False,en_US,User One,1,True,US:CA,"250 Executive Park Blvd, Suite 3400",contact
+True,My Company (San Francisco),My Company (San Francisco),"YourCompany, User Two",US,user2@example.com,Chief Operations Officer (COO),False,en_US,User Two,1,True,US:CA,"250 Executive Park Blvd, Suite 3400",contact
