@@ -24,7 +24,8 @@ from stimula.header.header_merger import HeaderMerger
 from stimula.header.odoo_header_parser import OdooHeaderParser
 from .context import cnx_context, get_metadata
 from .diff_to_sql import DiffToSql
-from .query_executor import ExecutionResult, OperationType
+from .query_executor import OperationType
+from ..compiler.alias_compiler import AliasCompiler
 
 _logger = logging.getLogger(__name__)
 
@@ -286,6 +287,14 @@ class DB:
         # get cnx from context
         cnx = cnx_context.cnx
 
+        # if header is empty and skiprows is 1, then take the first line as header
+        if not header and skiprows == 1:
+            # get header from first line
+            header = body.split('\n', 1)[0]
+
+        # assert that we have a header
+        assert header, "Header is required, either as a parameter or as the first line in the body with skiprows set to 1"
+
         # parse header to build syntax tree
         mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
 
@@ -525,11 +534,9 @@ class DB:
 
     def _move_line_to_front(self, df):
         # move __line__ to become the left most column. This has no real purpose, but it makes the dataframes more readable
-         # this must also work with the multi-index dataframes coming from the compare function
-        # get __line__ column as a series
-        line = df['__line__']
-        # drop __line__ column, use level parameter to improve performance
-        df = df.drop(columns=['__line__'])
+        # this must also work with the multi-index dataframes coming from the compare function
+        # pop __line__ column, don't use drop because that triggers a warning
+        line = df.pop('__line__')
         # insert __line__ column as first column
         df.insert(0, '__line__', line)
         return df
@@ -548,8 +555,11 @@ class DB:
         return str(query)
 
     def _create_select_query(self, mapping, where_clause):
+        # add aliases and parameter names
+        aliased_mapping = AliasCompiler().compile(mapping)
+
         # translate syntax tree to select query
-        return SelectCompiler().compile(mapping, where_clause)
+        return SelectCompiler().compile(aliased_mapping, where_clause)
 
     def get_header_json(self, table_name, header=None):
         # get mapping, merged if needed

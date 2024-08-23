@@ -4,7 +4,6 @@ This script defines an Invoker class intended for remote invocations of the Stim
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
-import sys
 
 import requests
 
@@ -66,45 +65,34 @@ class Invoker:
         # return the token from json response
         return self.get(path, params).text
 
-    def post_table(self, table, header, query, files, skiprows, insert, update, delete, execute, commit, format, deduplicate, post_script, context):
+    def post_table(self, tables, header, query, files, skiprows, insert, update, delete, execute, commit, format, deduplicate, post_script, context):
+        assert files is not None and len(files) > 0, 'Provide one or more files to post'
 
+        assert len(tables) == len(files), "Provide exactly one file per table, not %s" % len(files)
 
+        if len(files) == 1:
+            # post single file from disk or stdin
+            path = f"tables/{tables[0]}"
 
-        if files and len(files) > 1:
+            # create query parameters
+            params = {"h": header, "q": query, 'skiprows': skiprows, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit, 'deduplicate': deduplicate,
+                      'style': format}
+
+            # return the result from json response
+            return self.post(path, params, data=files[0]).text
+
+        else:
             # post multiple files
             path = f"tables"
 
             # send filter as query parameter
-            params = {'t': ','.join(table), 'h': header, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit}
+            params = {'t': ','.join(tables), 'h': header, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit}
 
-            # use table names as keys in file dictionary
-            assert len(table) == len(files), "Provide exactly one file per table, not %s" % len(files)
-            files = {table[i]: files[i] for i in range(len(table))}
+            # zip table names and files to create file dictionary for post request
+            files = {table: file for table, file in zip(tables, files)}
 
             # return the token from json response
             return self.post_multi(path, params, files=files).text
-
-        # post single table
-        path = f"tables/{table}"
-
-        if files and len(files) == 1:
-
-            # post single file
-            with files[0] as file:
-                data = file.read()
-        elif sys.stdin.isatty():
-            # Input is being piped in
-            data = sys.stdin.read()
-        else:
-            # no contents provided
-            raise Exception('No contents provided, either use --file or -f flag, or pipe data to stdin.')
-
-        # send filter as query parameter
-        params = {"h": header, "q": query, 'skiprows': skiprows, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit, 'deduplicate': deduplicate,
-                  'style': format}
-
-        # return the token from json response
-        return self.post(path, params, data=data).text
 
     def get(self, path, params):
         # create connection url

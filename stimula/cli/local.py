@@ -43,38 +43,27 @@ class Invoker:
 
     def post_table(self, table, header, query, files, skiprows, insert, update, delete, execute, commit, format, deduplicate, post_script, context):
 
-        # array for reading multiple files
-        contents = []
-        # use filenames as context list
-        contexts = [file.name for file in files]
-        if files:
-            # read multiple files from args.file
-            for file in files:
-                with file:
-                    contents.append(file.read())
-        elif not sys.stdin.isatty():
-            # Input is being piped in
-            contents.append(sys.stdin.read())
-
         if format == None or format == 'diff':
             # post table and get diff dataframes
-            post_result = self._db.post_table_get_diff(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script)
+            post_result = self._db.post_table_get_diff(table, header, query, files, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script)
             # convert dataframes to CSV response body
             return '\n\n'.join([df.to_csv(index=False) for df in post_result])
         elif format == 'sql':
             # post table and get sql
-            post_result = self._db.post_table_get_sql(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script)
+            post_result = self._db.post_table_get_sql(table, header, query, files, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script)
             # convert df to response body, use double quotes where needed
             return post_result.to_csv(index=False, quotechar="\"")
-        elif format == 'full' and len(contents) == 1:
+        elif format == 'full' and len(files) == 1:
             assert len(table) == 1, "Provide exactly one table name to match contents, not %s" % len(table)
-            context = context[0] if len(context) == 1 else None
+            # take body from first file and convert to string
+            body = files[0].decode('utf-8')
+            context = context[0] if context and len(context) == 1 else None
             # post table and get full report
-            post_result = self._db.post_table_get_full_report(table[0], header, query, contents[0], skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script, context=context)
+            post_result = self._db.post_table_get_full_report(table[0], header, query, body, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script, context=context)
             # return json as string
             return post_result
-        elif len(contents) > 1:
-            post_result = self._db.post_multiple_tables_get_full_report(table, header, query, contents, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script, context=contexts)
+        elif len(files) > 1:
+            post_result = self._db.post_multiple_tables_get_full_report(table, header, query, files, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, deduplicate=deduplicate, post_script=post_script, context=context)
             return post_result
 
 

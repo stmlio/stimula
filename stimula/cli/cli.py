@@ -50,11 +50,13 @@ from io import StringIO
 import pandas as pd
 
 from stimula.cli import local, remote
+from stimula.cli.file_source import FileSource
+from stimula.cli.google_source import GoogleSource, google_authenticate
 
 
 def main():
     parser = argparse.ArgumentParser(description='stimula - The STML CLI')
-    parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose'])
+    parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose', 'google'])
     parser.add_argument('-r', '--remote', help='Remote API URL')
     parser.add_argument('-H', '--host', help='Database host', default='localhost')
     parser.add_argument('-P', '--port', help='Database port', type=int, default=5432)
@@ -63,10 +65,10 @@ def main():
     parser.add_argument('-p', '--password', help='Password')
     parser.add_argument('-k', '--key', help='Secret key')
     parser.add_argument('-T', '--token', help='Authentication token')
-    parser.add_argument('-t', '--table', nargs='+', help='Table name or filter')
+    parser.add_argument('-t', '--tables', nargs='+', help='One or more table names or a table name filter')
     parser.add_argument('-q', '--query', help='Query clause')
     parser.add_argument('-m', '--mapping', help='Mapping header')
-    parser.add_argument('-f', '--file', nargs='+', help='Path to the file to post', type=argparse.FileType('rb'))
+    parser.add_argument('-f', '--files', nargs='+', help='One or more paths to the files to post')
     parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
     parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
     parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
@@ -75,13 +77,17 @@ def main():
     parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
     parser.add_argument('-M', '--transpose', action='store_true', help='Transpose the mapping')
     parser.add_argument('-x', '--execute', help='Script to execute on post')
-    parser.add_argument('-c', '--context', nargs='+', help='Free text to match the query results')
+    parser.add_argument('-c', '--context', nargs='+', help='Free text to match the query results, usually a source file name')
+    parser.add_argument('-G', '--google_auth', nargs='?', help='Optional path of Google credentials file', const='client_secret.json')
+    parser.add_argument('-g', '--google_sheet', nargs='?', help='ID of Google Sheets document')
 
 
     args = parser.parse_args()
 
     try:
         execute_command(args)
+
+        return 0
     except Exception as e:
         if args.verbose:
             # print message with stack trace
@@ -89,8 +95,7 @@ def main():
         else:
             # print message without stack trace to stderr
             print(f'Error: {e}', file=sys.stderr)
-
-        sys.exit(1)
+        return 1
 
 
 def execute_command(args):
@@ -99,6 +104,11 @@ def execute_command(args):
         # transpose stdin to stdout and exit
         _transpose_stdin_stdout()
         return
+
+    if args.command == 'google':
+        assert args.google_auth, 'No Google credentials file provided. Use --google-auth or -G to provide Google credentials json file.'
+        google_authenticate(args.google_auth)
+
 
     if args.remote:
         # if remote is specified, use remote invoker
@@ -142,29 +152,36 @@ def execute_command(args):
     if args.command == 'auth':
         print(f'Token: {args.token}')
     elif args.command == 'list':
-        filter = args.table[0] if args.table else None
+        filter = args.tables[0] if args.tables else None
         tables = invoker.list(filter)
         # print name and count of tables
         for table in tables:
             print(f'{table["name"]}: {table["count"]}')
     elif args.command == 'mapping':
-        assert args.table, 'Table name must be provided using -t or --table flag.'
-        mapping = invoker.mapping(args.table[0])
+        assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
+        mapping = invoker.mapping(args.tables[0])
         print(mapping)
     elif args.command == 'count':
-        assert args.table, 'Table name must be provided using -t or --table flag.'
-        count = invoker.count(args.table[0], args.mapping, args.query)
+        assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
+        count = invoker.count(args.tables[0], args.mapping, args.query)
         print(count)
     elif args.command == 'get':
-        assert args.table, 'Table name must be provided using -t or --table flag.'
-        table = invoker.get_table(args.table[0], args.mapping, args.query)
+        assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
+        table = invoker.get_table(args.tables[0], args.mapping, args.query)
         print(table)
     elif args.command == 'post':
-        assert args.table, 'Table name must be provided using -t or --table flag.'
-        assert args.enable, 'At least one of the flags I, U, D, E, or C must be enabled. Otherwise, there\'s nothing to do.'
 
-        # raise error if no contents are provided
-        assert (args.file and len(args.file) > 0) or not sys.stdin.isatty(), 'No contents provided, either use --file or -f flag, or pipe data to stdin.'
+        # we need at least one of the flags I, U, D,  enabled
+        assert args.enable, 'At least one of the flags I, U, D must be enabled. Otherwise, there\'s nothing to do.'
+
+        # read data from Google Sheets or from file
+        if args.google_sheet:
+            source = GoogleSource(args.google_sheet)
+        else:
+            source = FileSource()
+
+        # read files from disk, stdin or google sheets. Also evaluate table and context
+        files, tables, context = source.read_files(args.files, args.tables, args.context)
 
         if args.mapping is None or args.mapping == '':
             assert args.skip > 0, 'No mapping provided and skip is zero. Specify a mapping using the --mapping or -m flag, or provide a file with a header row and --skip > 0.'
@@ -175,7 +192,7 @@ def execute_command(args):
         if args.verbose:
             print(f'Mapping: {args.mapping}')
 
-        csv = invoker.post_table(args.table, args.mapping, args.query, args.file,
+        csv = invoker.post_table(tables, args.mapping, args.query, files,
                                  skiprows=args.skip,
                                  insert='I' in args.enable,
                                  update='U' in args.enable,
@@ -185,7 +202,7 @@ def execute_command(args):
                                  format=args.format,
                                  deduplicate=args.deduplicate,
                                  post_script=args.execute,
-                                 context=args.context)
+                                 context=context)
         print(csv)
 
 
