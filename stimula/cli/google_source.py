@@ -56,6 +56,9 @@ class GoogleSource:
         sheet = client.open_by_key(self.sheet_id)
         # create map from sheet name to sheet
         all_sheets = {ws.title: ws for ws in sheet.worksheets()}
+        # get file_names that do not exist in all_sheets
+        missing_files = set(file_names) - set(all_sheets.keys())
+        assert not missing_files, f"Sheet(s) {', '.join(missing_files)} not found in spreadsheet."
         # get all worksheets
         sheets = [all_sheets[file_name] for file_name in file_names]
         # read contents of each sheet into a dataframe

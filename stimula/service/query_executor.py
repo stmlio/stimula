@@ -162,7 +162,7 @@ class ExecutionResult:
         self.operation_type = operation_type
         self.success = success
         self.rowcount = rowcount
-        self.table = table_name
+        self.table_name = table_name
         self.query = query
         self.params = params
         self.context = context

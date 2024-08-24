@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='stimula',
-    version='0.0.14',
+    version='0.0.15',
     description='Toolset library for Simple Table Mapping Language (STML)',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',

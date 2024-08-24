@@ -88,11 +88,11 @@ class Invoker:
             # send filter as query parameter
             params = {'t': ','.join(tables), 'h': header, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit}
 
-            # zip table names and files to create file dictionary for post request
-            files = {table: file for table, file in zip(tables, files)}
+            # zip table names and files to create file dictionary for post request. Make sure the keys are unique
+            file_map = {f'file{suffix}': (file_name, file, 'text/csv') for suffix, file_name, file in zip(range(len(files)), context, files)}
 
             # return the token from json response
-            return self.post_multi(path, params, files=files).text
+            return self.post_multi(path, params, files=file_map).text
 
     def get(self, path, params):
         # create connection url
