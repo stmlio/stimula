@@ -44,6 +44,11 @@ class HeaderCompiler:
         # remove empty columns
         return [c for c in columns if c]
 
+    def compile_list_deduplicate(self, mapping):
+        if 'columns' not in mapping:
+            return []
+        return [self._column(c) for c in mapping['columns'] if c.get('deduplicate', False)]
+
     def _column(self, column):
         # empty column does not have attributes
         if 'attributes' not in column:

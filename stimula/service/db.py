@@ -317,6 +317,7 @@ class DB:
         column_names = HeaderCompiler().compile_list(mapping, include_skip=True)
         index_columns = HeaderCompiler().compile_list_unique(mapping)
         column_types = TypesCompiler().compile(mapping, column_names, include_skip=True)
+        deduplicate_columns = HeaderCompiler().compile_list_deduplicate(mapping)
 
         # assert that at least one column header is not empty
         if not [c for c in column_names if c != '']:
@@ -384,8 +385,8 @@ class DB:
         df_padded.insert(0, '__line__', range(0, len(df)))
 
         # deduplicate if requested
-        if deduplicate:
-            df_padded = self._deduplicate(df_padded, index_columns)
+        if deduplicate_columns:
+            df_padded = self._deduplicate(df_padded, deduplicate_columns)
 
         # verify that there are no duplicate index values
         if df_padded.index.has_duplicates:
