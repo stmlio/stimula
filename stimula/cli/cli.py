@@ -192,7 +192,7 @@ def execute_command(args):
         if args.verbose:
             print(f'Mapping: {args.mapping}')
 
-        csv = invoker.post_table(tables, args.mapping, args.query, files,
+        result = invoker.post_table(tables, args.mapping, args.query, files,
                                  skiprows=args.skip,
                                  insert='I' in args.enable,
                                  update='U' in args.enable,
@@ -203,7 +203,10 @@ def execute_command(args):
                                  deduplicate=args.deduplicate,
                                  post_script=args.execute,
                                  context=context)
-        print(csv)
+
+        print(result)
+
+
 
 
 def validate_flags(value):

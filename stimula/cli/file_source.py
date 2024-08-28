@@ -139,9 +139,9 @@ class StmlEvaluator:
         # get list of additional non-empty headers to treat as modifiers from the source_columns_row
         modifiers = df.iloc[source_columns_row, 2:].tolist()
         # supported modifiers
-        known_modifiers = ['unique', 'skip', 'default-value', 'exp', 'deduplicate']
+        known_modifiers = ['unique', 'skip', 'default-value', 'exp', 'deduplicate', 'table', 'name', 'qualifier', 'key']
         # list unknown modifiers
-        unknown_modifiers = [modifier for modifier in modifiers if modifier and modifier not in known_modifiers and not isnan(modifier)]
+        unknown_modifiers = [modifier for modifier in modifiers if modifier and modifier not in known_modifiers and modifier]
         # assert no unknown modifiers
         assert not unknown_modifiers, f'Unknown modifiers: {unknown_modifiers}'
         return modifiers
