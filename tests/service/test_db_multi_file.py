@@ -32,13 +32,13 @@ def test_post_multiple_tables_get_full_report(db, books, context):
             'failed': {'insert': 0, 'update': 0, 'delete': 0}
         },
         'rows': [
-            {'line_number': 3, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table': 'authors', 'context': 'authors.csv',
+            {'line_number': 3, 'operation_type': OperationType.INSERT, 'success': True, 'rowcount': 1, 'table_name': 'authors', 'context': 'authors.csv',
              'query': 'insert into authors(name) select :name',
              'params': {'name': 'Charles John Huffam Dickens'}},
-            {'line_number': 3, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table': 'books', 'context': 'books.csv',
+            {'line_number': 3, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table_name': 'books', 'context': 'books.csv',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'title': 'David Copperfield', 'name': 'Charles John Huffam Dickens'}},
-            {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table': 'authors', 'context': 'authors.csv',
+            {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table_name': 'authors', 'context': 'authors.csv',
              'query': 'delete from authors where authors.name = :name',
              'params': {'name': 'Charles Dickens'}}
         ]}

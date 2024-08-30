@@ -140,9 +140,9 @@ class DB:
         # convert dataframe to csv
         return df.to_csv(index=False, escapechar=escapechar)
 
-    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None, context=None):
+    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None):
         # create diffs and sql
-        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
+        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context)
         # if execute
         if execute:
             # execute sql statements
@@ -155,9 +155,9 @@ class DB:
 
         return diffs
 
-    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False, post_script=None, context=None):
+    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None):
         # create diffs and sql
-        _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
+        _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context)
 
         # execute sql statements, or fake if execute is false
         sqls = self._execute_sql(query_executors, execute, commit)
@@ -165,10 +165,10 @@ class DB:
         # convert sql to dataframe
         return self._convert_to_df(sqls, execute)
 
-    def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False,
+    def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
                                    post_script=None, context=None):
         # create diffs and sql
-        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context)
+        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context)
 
         # execute sql statements
         execution_results = self._execute_sql(query_executors, execute, commit)
@@ -176,12 +176,11 @@ class DB:
         # create full report
         return self._create_post_report(execution_results, execute, commit)
 
-    def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False,
+    def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
                                              post_script=None, context=None):
         assert len(table_names) == len(contents), f"Provide exactly one file for each table name, so {len(table_names)}, not {len(contents)}"
         assert header is None, "Header must be None when posting multiple tables"
         assert skiprows ==1, "Skiprows must be 1 when posting multiple tables"
-        assert deduplicate == False, "Deduplicate must be False when posting multiple tables"
         assert post_script is None, "Post script must be None when posting multiple tables"
         assert context is not None and len(context) == len(table_names), "Provide exactly one context for each table name, not %s" % len(context or [])
 
@@ -196,7 +195,7 @@ class DB:
             header = text_content.split('\n', 1)[0]
 
             # create diffs and sql
-            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, deduplicate, post_script, file_context)
+            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, post_script, file_context)
             query_executors.extend(qe)
 
         # execute sql statements
@@ -267,7 +266,7 @@ class DB:
         # return dataframe
         return result
 
-    def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, deduplicate=False):
+    def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
         with self._database_session() as (engine, metadata):
             # parse header to build syntax tree
             diffs, sql = self._get_diffs_and_sql(engine, metadata, table_name, header, where_clause, body, skiprows, insert, update, delete)
@@ -283,7 +282,7 @@ class DB:
 
             return result
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, deduplicate, post_script, context):
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context):
         # get cnx from context
         cnx = cnx_context.cnx
 
@@ -299,7 +298,7 @@ class DB:
         mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
 
         # read dataframe from request first, so we can give feedback on errors in the request
-        df_request = self._read_from_request(mapping, body, skiprows, deduplicate, post_script)
+        df_request = self._read_from_request(mapping, body, skiprows, post_script)
 
         # read dataframe from DB
         df_db = self._read_from_db(mapping, where_clause, set_index=True)
@@ -312,7 +311,7 @@ class DB:
 
         return diffs, sqls
 
-    def _read_from_request(self, mapping, body, skiprows, deduplicate=False, post_script=None):
+    def _read_from_request(self, mapping, body, skiprows, post_script=None):
         # get columns and unique columns.
         column_names = HeaderCompiler().compile_list(mapping, include_skip=True)
         index_columns = HeaderCompiler().compile_list_unique(mapping)

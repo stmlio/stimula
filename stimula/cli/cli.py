@@ -34,7 +34,6 @@ Options:
 -s, --skip        Number of rows to skip (default: 1)
 -e, --enable      Enable flags (I, U, D, E, C)
 -F, --format      Response format (choices: diff, sql)
--D, --deduplicate Deduplicate records based on primary key
 -v, --version     Print version information
 -V, --verbose     Increase output verbosity
 -M, --transpose   Transpose the mapping
@@ -72,7 +71,6 @@ def main():
     parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
     parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
     parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
-    parser.add_argument('-D', '--deduplicate', action='store_true', help='Deduplicate by unique key')
     parser.add_argument('-v', '--version', action='version', version=version('stimula'))
     parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
     parser.add_argument('-M', '--transpose', action='store_true', help='Transpose the mapping')
@@ -200,7 +198,6 @@ def execute_command(args):
                                  execute='E' in args.enable,
                                  commit='C' in args.enable,
                                  format=args.format,
-                                 deduplicate=args.deduplicate,
                                  post_script=args.execute,
                                  context=context)
 
