@@ -1,9 +1,9 @@
 from integration_tests.test_local import call_main
 
-REMOTE = 'http://localhost:8069/'
-DB_NAME = 'beauty'
-# REMOTE = 'https://stmlio-stimula-odoo1-dev-14859116.dev.odoo.com/'
-# DB_NAME = 'stmlio-stimula-odoo1-dev-14859116'
+# REMOTE = 'http://localhost:8069/'
+# DB_NAME = 'beauty'
+REMOTE = 'https://stmlio-stimula-odoo1-dev-14859116.dev.odoo.com/'
+DB_NAME = 'stmlio-stimula-odoo1-dev-14859116'
 DB_USER = 'admin'
 DB_PASS = 'admin'
 SHEET_ID = '1xmESHdfahhCoEfc5rESEdIl6v-UHFBP9W5u5WB2pUE4'
@@ -26,7 +26,7 @@ def test_post_multiple_files():
 
 
 def test_post_stml_file():
-    call_main(f'stimula post -r {REMOTE} -g {SHEET_ID} -f customer_contact.stml -e IUE -V')
+    call_main(f'stimula post -r {REMOTE} -g {SHEET_ID} -f customer_delivery.stml -e IUEC -V')
 
 
 def test_post_multiple_stml_files():

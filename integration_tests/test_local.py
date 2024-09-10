@@ -1,3 +1,4 @@
+import glob
 import sys
 from unittest.mock import patch
 
@@ -34,6 +35,22 @@ def test_post_multiple_files(mock_isatty):
 @patch('sys.stdin.isatty', return_value=True)
 def test_post_stml_file(mock_isatty):
     call_main(f'stimula post -k {STIMULA_KEY} -f csv/res_partner.stml -e IUE -V')
+
+
+@patch('sys.stdin.isatty', return_value=True)
+def test_post_stml_file(mock_isatty):
+    call_main(f'stimula post -k {STIMULA_KEY} -f beauty/customer.stml -e IUE -V')
+
+
+@patch('sys.stdin.isatty', return_value=True)
+def test_post_with_wildcard(mock_isatty):
+    paths = expand_path('../demo/*.csv')
+    call_main(f'stimula post -k {STIMULA_KEY} -f {paths} -e IUE -V')
+
+
+def expand_path(path):
+    # Expand wildcards to a space-separated list of file names
+    return ' '.join(glob.glob(path))
 
 
 def call_main(cmd):

@@ -10,8 +10,10 @@ SHEET_ID = '1xmESHdfahhCoEfc5rESEdIl6v-UHFBP9W5u5WB2pUE4'
 def _test_google_auth():
     call_main(f'stimula google -G ../google_client_secret.json -V')
 
+
 def test_auth():
     call_main(f'stimula auth -k {STIMULA_KEY} -d {DB_NAME} -u {DB_USER} -p {DB_PASS}')
+
 
 def test_post_single_file():
     call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f res_partner -e IUE -V')
@@ -25,5 +27,9 @@ def test_post_stml_file():
     call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f customer_contact.stml -e IUE -V')
 
 
+def test_post_stml_file():
+    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f items_category.stml -e IUEC -V')
+
+
 def test_post_multiple_stml_files():
-    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f customer_contact.stml customer_delivery.stml -e IUE -V')
+    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f items_template.stml items_product.stml -e IUEC -V')
