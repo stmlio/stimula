@@ -82,3 +82,12 @@ def test_authenticate_expired_token(db_params):
     with pytest.raises(jwt.ExpiredSignatureError):
         # validate
         auth.validate_token(token)
+
+
+def test_get_database_and_username(auth, db_params):
+    # create token
+    token = auth.authenticate(db_params['database'], db_params['user'], db_params['password'])
+    # decode token
+    database, username = auth.get_database_and_username(token)
+    assert database == db_params['database']
+    assert username == db_params['user']

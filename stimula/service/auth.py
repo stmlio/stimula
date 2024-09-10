@@ -35,7 +35,7 @@ class Auth(ABC):
         iat = int(time.time())
 
         # create token payload
-        payload = {"database": database, "uid": uid, "password": encrypted_password, "salt": salt, "iat": iat}
+        payload = {"database": database, "username": username, "uid": uid, "password": encrypted_password, "salt": salt, "iat": iat}
         token = jwt.encode(payload, self._secret_key, algorithm='HS256')
         return token
 
@@ -58,6 +58,12 @@ class Auth(ABC):
 
         # return validation result
         return result
+
+    def get_database_and_username(self, token):
+        # decode token, without verifying the signature
+        payload = jwt.decode(token, options={"verify_signature": False})
+        # return database and username for easy re-authentication
+        return payload['database'], payload['username']
 
     @abstractmethod
     def _validate_submitted_credentials(self, database, username, password):

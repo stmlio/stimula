@@ -41,6 +41,7 @@ Options:
 """
 
 import argparse
+import getpass
 import os
 import sys
 from importlib.metadata import version
@@ -125,12 +126,10 @@ def execute_command(args):
     # try to read token from local file
     _read_token_from_file(args)
 
-    # if auth request or no token provide
+    # if auth request or no token provided
     if args.command == 'auth' or not args.token:
         # authenticate and set token
-        args.token = invoker.auth(args.database, args.user, args.password)
-        #     # write token to local file
-        _write_token_to_file(args.token)
+        _authenticate(args, invoker)
 
     # validate token and set connection context
     invoker.set_context(args.token)
@@ -204,6 +203,27 @@ def execute_command(args):
         print(result)
 
 
+def _authenticate(args, invoker):
+    # assert that database and username are provided if we don't have a token
+    if not args.token:
+        assert args.database and args.user, 'Database and username must be provided for authentication.'
+
+    # if we have a token, then use it for default database and username
+    if args.token:
+        # get database and username from token
+        database, user = invoker.get_database_and_username(args.token)
+        # default to token values if not provided
+        args.database = args.database or database
+        args.user = args.user or user
+
+    # ask for password if not provided
+    if not args.password:
+        # hide password input
+        args.password = getpass.getpass(f'Enter password for {args.user}@{args.database}: ')
+    # authenticate and set token
+    args.token = invoker.auth(args.database, args.user, args.password)
+    # write token to local file
+    _write_token_to_file(args.token)
 
 
 def validate_flags(value):

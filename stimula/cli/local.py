@@ -29,6 +29,9 @@ class Invoker:
     def auth(self, database, username, password):
         return self._auth.authenticate(database, username, password)
 
+    def get_database_and_username(self, token):
+        return self._auth.get_database_and_username(token)
+
     def list(self, filter):
         return self._db.get_tables(filter)
 
