@@ -2,7 +2,7 @@ import jwt
 import pytest
 from jwt import InvalidSignatureError
 
-from stimula.service.auth import Auth
+from tests.conftest import TestAuth
 
 
 def test_authenticate(auth, db_params):
@@ -72,3 +72,13 @@ def test_cipher_length_always_the_same(auth):
     cipher1, salt1 = auth.encrypt(secret, plaintext1)
     cipher2, salt2 = auth.encrypt(secret, plaintext2)
     assert len(cipher1) == len(cipher2)
+
+
+def test_authenticate_expired_token(db_params):
+    auth = TestAuth('secret', lifetime=0)
+    # create token
+    token = auth.authenticate(db_params['database'], db_params['user'], db_params['password'])
+    # expect ExpiredSignatureError
+    with pytest.raises(jwt.ExpiredSignatureError):
+        # validate
+        auth.validate_token(token)

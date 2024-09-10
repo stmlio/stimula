@@ -6,6 +6,7 @@ Email: romke@rnadesign.net
 """
 import base64
 import os
+import time
 
 import jwt
 from cryptography.hazmat.backends import default_backend
@@ -17,10 +18,11 @@ from abc import ABC, abstractmethod
 
 class Auth(ABC):
     # set the secret key during instantiation
-    def __init__(self, secret_key):
+    def __init__(self, secret_key, lifetime=900):
         # secret_key must be set
         assert secret_key, 'Secret key must be set'
         self._secret_key = secret_key
+        self._lifetime = lifetime
 
     def authenticate(self, database, username, password):
         # validate submitted credentials and obtain user ID to store in token
@@ -29,7 +31,11 @@ class Auth(ABC):
         # encrypt password
         encrypted_password, salt = self.encrypt(self._secret_key, password)
 
-        payload = {"database": database, "uid": uid, "password": encrypted_password, "salt": salt}
+        # issued at
+        iat = int(time.time())
+
+        # create token payload
+        payload = {"database": database, "uid": uid, "password": encrypted_password, "salt": salt, "iat": iat}
         token = jwt.encode(payload, self._secret_key, algorithm='HS256')
         return token
 
@@ -38,7 +44,11 @@ class Auth(ABC):
         payload = jwt.decode(token, self._secret_key, algorithms=['HS256'])
 
         # get connection parameters from payload
-        database, uid, encrypted_password, salt = payload['database'], payload['uid'], payload['password'], payload['salt']
+        database, uid, encrypted_password, salt, iat = payload['database'], payload['uid'], payload['password'], payload['salt'], payload['iat']
+
+        # check if token is expired
+        if iat + self._lifetime <= int(time.time()):
+            raise jwt.ExpiredSignatureError('Token has expired, please log in again.')
 
         # decrypt password
         password = self.decrypt(self._secret_key, encrypted_password, salt)

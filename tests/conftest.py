@@ -15,8 +15,8 @@ from stimula.header.csv_header_parser import HeaderParser
 
 
 class TestAuth(Auth):
-    def __init__(self, secret_key):
-        super().__init__(secret_key)
+    def __init__(self, secret_key, lifetime=900):
+        super().__init__(secret_key, lifetime)
 
     def _validate_submitted_credentials(self, database, username, password):
         pass
