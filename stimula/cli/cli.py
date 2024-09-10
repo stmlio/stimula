@@ -54,179 +54,221 @@ from stimula.cli.file_source import FileSource
 from stimula.cli.google_source import GoogleSource, google_authenticate
 
 
-def main():
-    parser = argparse.ArgumentParser(description='stimula - The STML CLI')
-    parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose', 'google'])
-    parser.add_argument('-r', '--remote', help='Remote API URL')
-    parser.add_argument('-H', '--host', help='Database host', default='localhost')
-    parser.add_argument('-P', '--port', help='Database port', type=int, default=5432)
-    parser.add_argument('-d', '--database', help='Database name')
-    parser.add_argument('-u', '--user', help='Database username')
-    parser.add_argument('-p', '--password', help='Password')
-    parser.add_argument('-k', '--key', help='Secret key')
-    parser.add_argument('-T', '--token', help='Authentication token')
-    parser.add_argument('-t', '--tables', nargs='+', help='One or more table names or a table name filter')
-    parser.add_argument('-q', '--query', help='Query clause')
-    parser.add_argument('-m', '--mapping', help='Mapping header')
-    parser.add_argument('-f', '--files', nargs='+', help='One or more paths to the files to post')
-    parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
-    parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
-    parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
-    parser.add_argument('-v', '--version', action='version', version=version('stimula'))
-    parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
-    parser.add_argument('-M', '--transpose', action='store_true', help='Transpose the mapping')
-    parser.add_argument('-x', '--execute', help='Script to execute on post')
-    parser.add_argument('-c', '--context', nargs='+', help='Free text to match the query results, usually a source file name')
-    parser.add_argument('-G', '--google_auth', nargs='?', help='Optional path of Google credentials file', const='client_secret.json')
-    parser.add_argument('-g', '--google_sheet', nargs='?', help='ID of Google Sheets document')
+class StimulaCLI:
+    def main(self):
+        # parse command line arguments
+        args = self.parse_args()
 
+        try:
+            # execute command
+            self.execute_command(args)
 
-    args = parser.parse_args()
+            return 0
+        except Exception as e:
+            if args.verbose:
+                # print message with stack trace
+                raise e
+            else:
+                # print message without stack trace to stderr
+                print(f'Error: {e}', file=sys.stderr)
+            return 1
 
-    try:
-        execute_command(args)
+    def parse_args(self):
+        parser = argparse.ArgumentParser(description='stimula - The STML CLI')
+        parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose', 'google'])
+        parser.add_argument('-r', '--remote', help='Remote API URL')
+        parser.add_argument('-H', '--host', help='Database host', default='localhost')
+        parser.add_argument('-P', '--port', help='Database port', type=int, default=5432)
+        parser.add_argument('-d', '--database', help='Database name')
+        parser.add_argument('-u', '--user', help='Database username')
+        parser.add_argument('-p', '--password', help='Password')
+        parser.add_argument('-k', '--key', help='Secret key')
+        parser.add_argument('-T', '--token', help='Authentication token')
+        parser.add_argument('-t', '--tables', nargs='+', help='One or more table names or a table name filter')
+        parser.add_argument('-q', '--query', help='Query clause')
+        parser.add_argument('-m', '--mapping', help='Mapping header')
+        parser.add_argument('-f', '--files', nargs='+', help='One or more paths to the files to post')
+        parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
+        parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
+        parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
+        parser.add_argument('-v', '--version', action='version', version=version('stimula'))
+        parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
+        parser.add_argument('-M', '--transpose', action='store_true', help='Transpose the mapping')
+        parser.add_argument('-x', '--execute', help='Script to execute on post')
+        parser.add_argument('-c', '--context', nargs='+', help='Free text to match the query results, usually a source file name')
+        parser.add_argument('-G', '--google_auth', nargs='?', help='Optional path of Google credentials file', const='client_secret.json')
+        parser.add_argument('-g', '--google_sheet', nargs='?', help='ID of Google Sheets document')
+        args = parser.parse_args()
+        return args
 
-        return 0
-    except Exception as e:
-        if args.verbose:
-            # print message with stack trace
-            raise e
+    def execute_command(self, args):
+
+        if args.command == 'transpose':
+            # transpose stdin to stdout and exit
+            self._transpose_stdin_stdout()
+            return
+
+        if args.command == 'google':
+            assert args.google_auth, 'No Google credentials file provided. Use --google-auth or -G to provide Google credentials json file.'
+            google_authenticate(args.google_auth)
+
+        if args.remote:
+            # if remote is specified, use remote invoker
+            invoker = remote.Invoker(args.remote)
         else:
-            # print message without stack trace to stderr
-            print(f'Error: {e}', file=sys.stderr)
-        return 1
+            # otherwise, read key from environment if not provided as argument
+            if not args.key:
+                args.key = os.getenv('STIMULA_KEY')
 
+            # if key is still not provided, raise an error
+            assert args.key, 'Secret key must be provided for local connection. Either connect to remote API, or set --key argument, or STIMULA_KEY environment variable'
 
-def execute_command(args):
+            # use local invoker
+            invoker = local.Invoker(args.key, args.host, args.port)
 
-    if args.command == 'transpose':
-        # transpose stdin to stdout and exit
-        _transpose_stdin_stdout()
-        return
+        # try to read token from local file
+        self._read_token_from_file(args)
 
-    if args.command == 'google':
-        assert args.google_auth, 'No Google credentials file provided. Use --google-auth or -G to provide Google credentials json file.'
-        google_authenticate(args.google_auth)
+        # if auth request or no token provided
+        if args.command == 'auth' or not args.token:
+            # authenticate and set token
+            self._authenticate(args, invoker)
 
+        # validate token and set connection context
+        invoker.set_context(args.token)
 
-    if args.remote:
-        # if remote is specified, use remote invoker
-        invoker = remote.Invoker(args.remote)
-    else:
-        # otherwise, read key from environment if not provided as argument
-        if not args.key:
-            args.key = os.getenv('STIMULA_KEY')
+        # check if mapping is provided as file name, then use the first line
+        self._read_mapping_from_file(args)
 
-        # if key is still not provided, raise an error
-        assert args.key, 'Secret key must be provided for local connection. Either connect to remote API, or set --key argument, or STIMULA_KEY environment variable'
+        if args.transpose:
+            # transpose mapping
+            self._transpose_mapping(args)
 
-        # use local invoker
-        invoker = local.Invoker(args.key, args.host, args.port)
+        # use only first line of mapping
+        if args.mapping:
+            args.mapping = args.mapping.splitlines()[0]
 
-    # try to read token from local file
-    _read_token_from_file(args)
+        # execute command
+        if args.command == 'auth':
+            print(f'Token: {args.token}')
+        elif args.command == 'list':
+            filter = args.tables[0] if args.tables else None
+            tables = invoker.list(filter)
+            # print name and count of tables
+            for table in tables:
+                print(f'{table["name"]}: {table["count"]}')
+        elif args.command == 'mapping':
+            assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
+            mapping = invoker.mapping(args.tables[0])
+            print(mapping)
+        elif args.command == 'count':
+            assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
+            count = invoker.count(args.tables[0], args.mapping, args.query)
+            print(count)
+        elif args.command == 'get':
+            assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
+            table = invoker.get_table(args.tables[0], args.mapping, args.query)
+            print(table)
+        elif args.command == 'post':
 
-    # if auth request or no token provided
-    if args.command == 'auth' or not args.token:
+            # we need at least one of the flags I, U, D,  enabled
+            assert args.enable, 'At least one of the flags I, U, D must be enabled. Otherwise, there\'s nothing to do.'
+
+            # read data from Google Sheets or from file
+            if args.google_sheet:
+                source = GoogleSource(args.google_sheet)
+            else:
+                source = FileSource()
+
+            # read files from disk, stdin or google sheets. Also evaluate table and context
+            files, tables, context = source.read_files(args.files, args.tables, args.context)
+
+            if args.mapping is None or args.mapping == '':
+                assert args.skip > 0, 'No mapping provided and skip is zero. Specify a mapping using the --mapping or -m flag, or provide a file with a header row and --skip > 0.'
+                assert not args.transpose, 'Cannot transpose mapping when reading header from data file.'
+                # leave it to the server to use first line of contents as mapping
+
+            # if verbose, print mapping
+            if args.verbose:
+                print(f'Mapping: {args.mapping}')
+
+            result = invoker.post_table(tables, args.mapping, args.query, files,
+                                        skiprows=args.skip,
+                                        insert='I' in args.enable,
+                                        update='U' in args.enable,
+                                        delete='D' in args.enable,
+                                        execute='E' in args.enable,
+                                        commit='C' in args.enable,
+                                        format=args.format,
+                                        post_script=args.execute,
+                                        context=context)
+
+            print(result)
+
+    def _authenticate(self, args, invoker):
+        # assert that database and username are provided if we don't have a token
+        if not args.token:
+            assert args.database and args.user, 'Database and username must be provided for authentication.'
+
+        # if we have a token, then use it for default database and username
+        if args.token:
+            # get database and username from token
+            database, user = invoker.get_database_and_username(args.token)
+            # default to token values if not provided
+            args.database = args.database or database
+            args.user = args.user or user
+
+        # ask for password if not provided
+        if not args.password:
+            # hide password input
+            args.password = getpass.getpass(f'Enter password for {args.user}@{args.database}: ')
         # authenticate and set token
-        _authenticate(args, invoker)
-
-    # validate token and set connection context
-    invoker.set_context(args.token)
-
-    # check if mapping is provided as file name, then use the first line
-    _read_mapping_from_file(args)
-
-    if args.transpose:
-        # transpose mapping
-        _transpose_mapping(args)
-
-    # use only first line of mapping
-    if args.mapping:
-        args.mapping = args.mapping.splitlines()[0]
-
-    # execute command
-    if args.command == 'auth':
-        print(f'Token: {args.token}')
-    elif args.command == 'list':
-        filter = args.tables[0] if args.tables else None
-        tables = invoker.list(filter)
-        # print name and count of tables
-        for table in tables:
-            print(f'{table["name"]}: {table["count"]}')
-    elif args.command == 'mapping':
-        assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
-        mapping = invoker.mapping(args.tables[0])
-        print(mapping)
-    elif args.command == 'count':
-        assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
-        count = invoker.count(args.tables[0], args.mapping, args.query)
-        print(count)
-    elif args.command == 'get':
-        assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
-        table = invoker.get_table(args.tables[0], args.mapping, args.query)
-        print(table)
-    elif args.command == 'post':
-
-        # we need at least one of the flags I, U, D,  enabled
-        assert args.enable, 'At least one of the flags I, U, D must be enabled. Otherwise, there\'s nothing to do.'
-
-        # read data from Google Sheets or from file
-        if args.google_sheet:
-            source = GoogleSource(args.google_sheet)
-        else:
-            source = FileSource()
-
-        # read files from disk, stdin or google sheets. Also evaluate table and context
-        files, tables, context = source.read_files(args.files, args.tables, args.context)
-
-        if args.mapping is None or args.mapping == '':
-            assert args.skip > 0, 'No mapping provided and skip is zero. Specify a mapping using the --mapping or -m flag, or provide a file with a header row and --skip > 0.'
-            assert not args.transpose, 'Cannot transpose mapping when reading header from data file.'
-            # leave it to the server to use first line of contents as mapping
-
-        # if verbose, print mapping
-        if args.verbose:
-            print(f'Mapping: {args.mapping}')
-
-        result = invoker.post_table(tables, args.mapping, args.query, files,
-                                 skiprows=args.skip,
-                                 insert='I' in args.enable,
-                                 update='U' in args.enable,
-                                 delete='D' in args.enable,
-                                 execute='E' in args.enable,
-                                 commit='C' in args.enable,
-                                 format=args.format,
-                                 post_script=args.execute,
-                                 context=context)
-
-        print(result)
+        args.token = invoker.auth(args.database, args.user, args.password)
+        # write token to local file
+        self._write_token_to_file(args.token)
 
 
-def _authenticate(args, invoker):
-    # assert that database and username are provided if we don't have a token
-    if not args.token:
-        assert args.database and args.user, 'Database and username must be provided for authentication.'
+    def _transpose_stdin_stdout(self):
+        # validate we have stdin
+        assert not sys.stdin.isatty(), 'No input provided, use piping to provide input.'
+        # read dataframe from stdin
+        df = pd.read_csv(sys.stdin, header=None)
+        # transpose the dataframe and write to stdout
+        df.T.to_csv(sys.stdout, header=False, index=False)
 
-    # if we have a token, then use it for default database and username
-    if args.token:
-        # get database and username from token
-        database, user = invoker.get_database_and_username(args.token)
-        # default to token values if not provided
-        args.database = args.database or database
-        args.user = args.user or user
+    def _read_token_from_file(self, args):
+        # try to read token from local file if not provided in arguments
+        if not args.token:
+            try:
+                with open('.stimula_token', 'r') as file:
+                    args.token = file.read()
+            except FileNotFoundError:
+                pass
 
-    # ask for password if not provided
-    if not args.password:
-        # hide password input
-        args.password = getpass.getpass(f'Enter password for {args.user}@{args.database}: ')
-    # authenticate and set token
-    args.token = invoker.auth(args.database, args.user, args.password)
-    # write token to local file
-    _write_token_to_file(args.token)
+    def _write_token_to_file(self, token):
+        # write token to local file
+        with open('.stimula_token', 'w') as file:
+            file.write(token)
+
+    def _read_mapping_from_file(self, args):
+        # check if args.mapping is an existing file name
+        if args.mapping and os.path.exists(args.mapping):
+            with open(args.mapping, 'r') as file:
+                # read the whole file, it may be a transposed mapping
+                args.mapping = file.read()
+
+    def _transpose_mapping(self, args):
+        assert args.mapping, 'Mapping must be provided when transposing.'
+        # get string from args.mapping, remove lines starting with #
+        mapping = '\n'.join(line for line in args.mapping.splitlines() if not line.startswith('#'))
+        # use pandas to read the mapping string into a dataframe
+        df = pd.read_csv(StringIO(mapping), header=None)
+        # transpose the dataframe, dispose all but the first row and convert to csv
+        args.mapping = df.T.head(1).to_csv(header=False, index=False)
 
 
 def validate_flags(value):
+    # validation function for enable flags
     valid_letters = set("IUDEC")
     input_set = set(value)
 
@@ -235,49 +277,8 @@ def validate_flags(value):
 
     return value
 
-
-def _transpose_stdin_stdout():
-    # validate we have stdin
-    assert not sys.stdin.isatty(), 'No input provided, use piping to provide input.'
-    # read dataframe from stdin
-    df = pd.read_csv(sys.stdin, header=None)
-    # transpose the dataframe and write to stdout
-    df.T.to_csv(sys.stdout, header=False, index=False)
-
-
-def _read_token_from_file(args):
-    # try to read token from local file if not provided in arguments
-    if not args.token:
-        try:
-            with open('.stimula_token', 'r') as file:
-                args.token = file.read()
-        except FileNotFoundError:
-            pass
-
-
-def _write_token_to_file(token):
-    # write token to local file
-    with open('.stimula_token', 'w') as file:
-        file.write(token)
-
-
-def _read_mapping_from_file(args):
-    # check if args.mapping is an existing file name
-    if args.mapping and os.path.exists(args.mapping):
-        with open(args.mapping, 'r') as file:
-            # read the whole file, it may be a transposed mapping
-            args.mapping = file.read()
-
-
-def _transpose_mapping(args):
-    assert args.mapping, 'Mapping must be provided when transposing.'
-    # get string from args.mapping, remove lines starting with #
-    mapping = '\n'.join(line for line in args.mapping.splitlines() if not line.startswith('#'))
-    # use pandas to read the mapping string into a dataframe
-    df = pd.read_csv(StringIO(mapping), header=None)
-    # transpose the dataframe, dispose all but the first row and convert to csv
-    args.mapping = df.T.head(1).to_csv(header=False, index=False)
-
+def main():
+    StimulaCLI().main()
 
 if __name__ == '__main__':
     main()
