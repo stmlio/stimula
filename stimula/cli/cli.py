@@ -203,7 +203,7 @@ class StimulaCLI:
                                         post_script=args.execute,
                                         context=context)
 
-            print(result)
+            print(self._create_report(result))
 
     def _authenticate(self, args, invoker):
         # assert that database and username are provided if we don't have a token
@@ -266,6 +266,41 @@ class StimulaCLI:
         # transpose the dataframe, dispose all but the first row and convert to csv
         args.mapping = df.T.head(1).to_csv(header=False, index=False)
 
+    def _create_report(self, result):
+        summary = result.get('summary', {})
+
+        # report failed
+        failed = summary.get('failed', {})
+        total_failed = failed.get('insert', 0) + failed.get('update', 0) + failed.get('delete', 0)
+        report_failed = 'Failed: '
+        if total_failed == 0:
+            report_failed += 'None\n'
+        else:
+            report_failed += f'{failed.get("insert", 0)} inserts, {failed.get("update", 0)} updates, {failed.get("delete", 0) } deletes\n'
+
+        # report found
+        found = summary.get('found', {})
+        total_found = found.get('insert', 0) + found.get('update', 0) + found.get('delete', 0)
+        report_found = 'Found: '
+        if total_found == 0:
+            report_found += 'None'
+        else:
+            report_found += f'{found.get("insert", 0)} inserts, {found.get("update", 0)} updates, {found.get("delete", 0)} deletes'
+
+        # committed?
+        committed = summary.get('commit', False)
+
+        # report success
+        success = summary.get('success', {})
+        total_success = success.get('insert', 0) + success.get('update', 0) + success.get('delete', 0)
+        report_success = 'Evaluated: ' if not committed else 'Committed: '
+        if total_success == 0:
+            report_success += 'None'
+        else:
+            report_success += f'{success.get("insert", 0)} inserts, {success.get("update", 0)} updates, {success.get("delete", 0)} deletes'
+
+        return (report_failed if total_failed > 0 else '') + (report_found if total_success == 0 else report_success)
+
 
 def validate_flags(value):
     # validation function for enable flags
@@ -278,7 +313,7 @@ def validate_flags(value):
     return value
 
 def main():
-    StimulaCLI().main()
+    return StimulaCLI().main()
 
 if __name__ == '__main__':
     main()
