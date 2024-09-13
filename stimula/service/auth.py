@@ -59,12 +59,6 @@ class Auth(ABC):
         # return validation result
         return result
 
-    def get_database_and_username(self, token):
-        # decode token, without verifying the signature
-        payload = jwt.decode(token, options={"verify_signature": False})
-        # return database and username for easy re-authentication
-        return payload['database'], payload['username']
-
     @abstractmethod
     def _validate_submitted_credentials(self, database, username, password):
         pass

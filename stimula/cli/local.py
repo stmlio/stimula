@@ -6,6 +6,7 @@ Email: romke@rnadesign.net
 """
 import sys
 
+import jwt
 import psycopg2
 from sqlalchemy import create_engine
 
@@ -30,7 +31,10 @@ class Invoker:
         return self._auth.authenticate(database, username, password)
 
     def get_database_and_username(self, token):
-        return self._auth.get_database_and_username(token)
+        # decode token, without verifying the signature
+        payload = jwt.decode(token, options={"verify_signature": False})
+        # return database and username for easy re-authentication
+        return payload['database'], payload['username']
 
     def list(self, filter):
         return self._db.get_tables(filter)

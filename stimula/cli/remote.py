@@ -4,7 +4,7 @@ This script defines an Invoker class intended for remote invocations of the Stim
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
-
+import jwt
 import requests
 
 
@@ -24,7 +24,13 @@ class Invoker:
         data = {"database": database, "username": username, "password": password}
 
         # return the token from json response
-        return self.post(path, data=data, send_token=False).json()['token']
+        return self.post(path, database=database, data=data, send_token=False).json()['token']
+
+    def get_database_and_username(self, token):
+        # decode token, without verifying the signature
+        payload = jwt.decode(token, options={"verify_signature": False})
+        # return database and username for easy re-authentication
+        return payload['database'], payload['username']
 
     def list(self, filter):
         # set path
@@ -111,15 +117,19 @@ class Invoker:
         # return the response
         return response
 
-    def post(self, path, params=None, data=None, send_token=True):
+    def post(self, path, database=None, params=None, data=None, send_token=True):
         # create connection url
         url = f"{self._remote}/stimula/1.0/{path}"
 
+        headers = {}
+
         # set bearer token
         if send_token:
-            headers = {"Authorization": f"Bearer {self._token}"}
-        else:
-            headers = {}
+            headers["Authorization"] = f"Bearer {self._token}"
+
+        # set database as host header, the odoo dbfilter uses this to route the request to the correct database
+        if database:
+            headers["Host"] = database
 
         # post data to the url
         response = requests.post(url, headers=headers, params=params, data=data)
