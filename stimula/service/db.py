@@ -662,8 +662,13 @@ class DB:
             else:
                 # nothing new completed, we're done
                 done = True
-        # return completed and failed lists
-        return completed + failed
+        # combine completed and failed lists
+        all_results = completed + failed
+
+        # sort by line_number
+        all_results.sort(key=lambda x: x.line_number)
+
+        return all_results
 
 
     def set_context(self, url, password):

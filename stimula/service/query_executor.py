@@ -111,7 +111,9 @@ class DependentQueryExecutor(QueryExecutor):
         # verify row was inserted
         if rowcount_0 == 0:
             _logger.warning("No row was inserted. Query: %s, Params: %s" % (query_0, params_0))
-            return (rowcount_0, query_0, params_0)
+            execution_result = ExecutionResult(self.line_number, self.operation_type, False, rowcount_0, self.table_name, self.query, params_0, self.context)
+            # skip execution of dependent query
+            return execution_result
 
         # verify no more than one row was inserted
         if rowcount_0 > 1:
@@ -128,7 +130,7 @@ class DependentQueryExecutor(QueryExecutor):
         cursor.execute(self._replace_placeholders(query_1), params_1)
         rowcount_1 = cursor.rowcount
 
-        # creaet execution result of dependent query
+        # create execution result of dependent query
         dependent_execution_result = ExecutionResult(self.line_number, self.operation_type, True, rowcount_1, self.table_name, query_1, params_1, self.context)
         execution_result.dependent_execution_result = dependent_execution_result
 
