@@ -203,7 +203,8 @@ class StimulaCLI:
                                         post_script=args.execute,
                                         context=context)
 
-            print(self._create_report(result))
+            print(self._create_report(result, args.verbose))
+
 
     def _authenticate(self, args, invoker):
         # assert that database and username are provided if we don't have a token
@@ -266,7 +267,7 @@ class StimulaCLI:
         # transpose the dataframe, dispose all but the first row and convert to csv
         args.mapping = df.T.head(1).to_csv(header=False, index=False)
 
-    def _create_report(self, result):
+    def _create_report(self, result, verbose):
         summary = result.get('summary', {})
 
         # report failed
@@ -299,7 +300,17 @@ class StimulaCLI:
         else:
             report_success += f'{success.get("insert", 0)} inserts, {success.get("update", 0)} updates, {success.get("delete", 0)} deletes'
 
-        return (report_failed if total_failed > 0 else '') + (report_found if total_success == 0 else report_success)
+
+        all_rows = ''
+        if not verbose:
+            # report errors
+            all_rows = '\n'.join([f'Line: {row["line_number"]} Error: {row["error"]}' for row in result.get('rows', []) if not row.get('success', False)])
+        else:
+            # report all rows
+            all_rows = '\n'.join([f'File: {row["context"]} Line: {row["line_number"]} Success: {row.get("success", False)} Error: {row.get("error", "")} Query: {row["query"]}' for row in result.get('rows', [])])
+
+
+        return (report_failed if total_failed > 0 else '') + (report_found if total_success == 0 else report_success) + ('\n' + all_rows if all_rows else '')
 
 
 def validate_flags(value):
