@@ -17,7 +17,8 @@ from stimula.service.db import DB
 
 class Invoker:
     def __init__(self, secret_key, host, port):
-        self._auth = LocalAuth(secret_key, host, port)
+        # for local client, the secret key does not depend on the database but is specified by the user
+        self._auth = LocalAuth(lambda database: secret_key, host, port)
         self._db = DB()
 
     def set_context(self, token):
@@ -31,10 +32,7 @@ class Invoker:
         return self._auth.authenticate(database, username, password)
 
     def get_database_and_username(self, token):
-        # decode token, without verifying the signature
-        payload = jwt.decode(token, options={"verify_signature": False})
-        # return database and username for easy re-authentication
-        return payload['database'], payload['username']
+        return self._auth.get_database_and_username(token)
 
     def list(self, filter):
         return self._db.get_tables(filter)
@@ -76,8 +74,8 @@ class Invoker:
 
 class LocalAuth(Auth):
     # set the secret key during instantiation
-    def __init__(self, secret_key, host, port):
-        super().__init__(secret_key)
+    def __init__(self, secret_key_function, host, port):
+        super().__init__(secret_key_function)
         self._host = host
         self._port = port
 

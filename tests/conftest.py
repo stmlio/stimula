@@ -15,8 +15,8 @@ from stimula.header.csv_header_parser import HeaderParser
 
 
 class TestAuth(Auth):
-    def __init__(self, secret_key, lifetime=900):
-        super().__init__(secret_key, lifetime)
+    def __init__(self, secret_key_function, lifetime_function=lambda: 900):
+        super().__init__(secret_key_function, lifetime_function)
 
     def _validate_submitted_credentials(self, database, username, password):
         pass
@@ -45,7 +45,7 @@ def url(db_params):
 
 @pytest.fixture
 def auth(db_params):
-    auth = TestAuth('secret')
+    auth = TestAuth(lambda: 'secret')
     auth.authenticate(db_params['database'], db_params['user'], db_params['password'])
     return auth
 
@@ -137,6 +137,8 @@ def books(cnx):
             cr.execute("""select nextval('books_bookid_seq')""")
 
         cnx.commit()
+
+
 @pytest.fixture
 def ir_model_data(cnx):
     with cnx.cursor() as cr:
@@ -150,11 +152,9 @@ def ir_model_data(cnx):
             module varchar not null,
             model varchar not null);''')
 
-
         external_ids = ({"res_id": 1, "name": "11111", "module": "netsuite_books", "model": "books"},
                         {"res_id": 2, "name": "22222", "module": "netsuite_books", "model": "books"},
                         {"res_id": 3, "name": "33333", "module": "netsuite_books", "model": "books"})
-
 
         for line in external_ids:
             cr.execute("INSERT INTO ir_model_data(res_id, name, module, model) VALUES(%(res_id)s, %(name)s, %(module)s, %(model)s)", line)

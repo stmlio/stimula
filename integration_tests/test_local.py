@@ -11,7 +11,7 @@ STIMULA_KEY = "secret"
 
 
 def test_auth():
-    call_main(f'stimula auth -k {STIMULA_KEY} -d {DB_NAME} -u {DB_USER} -p {DB_PASS}')
+    call_main(f'stimula auth -k {STIMULA_KEY} -d {DB_NAME} -u {DB_USER} -p {DB_PASS} -V')
 
 
 # make stimula believe it's in TTY mode, even though it's started from test runner
@@ -24,7 +24,7 @@ def test_pipe_single_file():
     # Open a file to simulate piping input
     with open('csv/res_users.csv', 'r') as f:
         with patch('sys.stdin', f):
-            call_main(f'stimula post -k {STIMULA_KEY} -t res_users -e IUE')
+            call_main(f'stimula post -k {STIMULA_KEY} -t res_users -e IUE -V')
 
 
 @patch('sys.stdin.isatty', return_value=True)
@@ -38,7 +38,7 @@ def test_post_stml_file(mock_isatty):
 
 
 @patch('sys.stdin.isatty', return_value=True)
-def test_post_stml_file(mock_isatty):
+def _test_post_stml_file(mock_isatty):
     call_main(f'stimula post -k {STIMULA_KEY} -f beauty/customer.stml -e IUE -V')
 
 

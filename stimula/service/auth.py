@@ -18,40 +18,57 @@ from abc import ABC, abstractmethod
 
 class Auth(ABC):
     # set the secret key during instantiation
-    def __init__(self, secret_key, lifetime=900):
-        # secret_key must be set
-        assert secret_key, 'Secret key must be set'
-        self._secret_key = secret_key
-        self._lifetime = lifetime
+    def __init__(self, secret_key_function, lifetime_function=lambda database: 900):
+        # secret_key function must be set.
+        # We can't evaluate the secret key in the constructor because we don't have a database connection during instantiation.
+        assert secret_key_function, 'Secret key must be set'
+        self._secret_key_function = secret_key_function
+        self._lifetime_function = lifetime_function
+
+    def get_database_and_username(self, token):
+        # decode token, without verifying the signature
+        payload = jwt.decode(token, options={"verify_signature": False})
+        # return database and username for easy re-authentication
+        return payload['database'], payload['username']
 
     def authenticate(self, database, username, password):
         # validate submitted credentials and obtain user ID to store in token
         uid = self._validate_submitted_credentials(database, username, password)
 
+        # evaluate secret key function for this database
+        secret_key = self._secret_key_function(database)
+
         # encrypt password
-        encrypted_password, salt = self.encrypt(self._secret_key, password)
+        encrypted_password, salt = self.encrypt(secret_key, password)
 
         # issued at
         iat = int(time.time())
 
         # create token payload
         payload = {"database": database, "username": username, "uid": uid, "password": encrypted_password, "salt": salt, "iat": iat}
-        token = jwt.encode(payload, self._secret_key, algorithm='HS256')
+        token = jwt.encode(payload, secret_key, algorithm='HS256')
         return token
 
     def validate_token(self, token):
-        # decode token
-        payload = jwt.decode(token, self._secret_key, algorithms=['HS256'])
+        # get database from token
+        database, _ = self.get_database_and_username(token)
+
+        # evaluate secret key function for this database
+        secret_key = self._secret_key_function(database)
+
+        # validate and decode token
+        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
 
         # get connection parameters from payload
         database, uid, encrypted_password, salt, iat = payload['database'], payload['uid'], payload['password'], payload['salt'], payload['iat']
 
         # check if token is expired
-        if iat + self._lifetime <= int(time.time()):
+        lifetime = self._lifetime_function(database)
+        if iat + lifetime <= int(time.time()):
             raise jwt.ExpiredSignatureError('Token has expired, please log in again.')
 
         # decrypt password
-        password = self.decrypt(self._secret_key, encrypted_password, salt)
+        password = self.decrypt(secret_key, encrypted_password, salt)
 
         # validate token credentials and return resulting objects
         result = self._validate_token_credentials(database, uid, password)

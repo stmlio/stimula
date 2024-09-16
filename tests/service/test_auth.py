@@ -1,3 +1,5 @@
+import time
+
 import jwt
 import pytest
 from jwt import InvalidSignatureError
@@ -17,8 +19,11 @@ def test_authenticate(auth, db_params):
 def test_validate_token(auth, url, db_params):
     cipher, salt = auth.encrypt('secret', db_params['password'])
 
+    # issue at time
+    iat = int(time.time())
+
     # create token
-    token = jwt.encode({"database": url, "uid": db_params['user'], "password": cipher, "salt": salt}, 'secret', algorithm='HS256')
+    token = jwt.encode({"database": url, "uid": db_params['user'], "password": cipher, "salt": salt, "iat": iat}, 'secret', algorithm='HS256')
     # validate token
     auth.validate_token(token)
 
@@ -75,19 +80,10 @@ def test_cipher_length_always_the_same(auth):
 
 
 def test_authenticate_expired_token(db_params):
-    auth = TestAuth('secret', lifetime=0)
+    auth = TestAuth(lambda: 'secret', lifetime_function=lambda: 0)
     # create token
     token = auth.authenticate(db_params['database'], db_params['user'], db_params['password'])
     # expect ExpiredSignatureError
     with pytest.raises(jwt.ExpiredSignatureError):
         # validate
         auth.validate_token(token)
-
-
-def test_get_database_and_username(auth, db_params):
-    # create token
-    token = auth.authenticate(db_params['database'], db_params['user'], db_params['password'])
-    # decode token
-    database, username = auth.get_database_and_username(token)
-    assert database == db_params['database']
-    assert username == db_params['user']

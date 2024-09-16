@@ -24,7 +24,7 @@ class Invoker:
         data = {"database": database, "username": username, "password": password}
 
         # return the token from json response
-        return self.post(path, database=database, data=data, send_token=False).json()['token']
+        return self.post(path, data=data, send_token=False).json()['token']
 
     def get_database_and_username(self, token):
         # decode token, without verifying the signature
@@ -85,7 +85,7 @@ class Invoker:
                       'style': format}
 
             # return the result from json response
-            return self.post(path, params, data=files[0]).text
+            return self.post(path, params=params, data=files[0]).json()
 
         else:
             # post multiple files
@@ -98,7 +98,7 @@ class Invoker:
             file_map = {f'file{suffix}': (file_name, file, 'text/csv') for suffix, file_name, file in zip(range(len(files)), context, files)}
 
             # return the token from json response
-            return self.post_multi(path, params, files=file_map).text
+            return self.post_multi(path, params, files=file_map).json()
 
     def get(self, path, params):
         # create connection url
@@ -117,7 +117,7 @@ class Invoker:
         # return the response
         return response
 
-    def post(self, path, database=None, params=None, data=None, send_token=True):
+    def post(self, path, params=None, data=None, send_token=True):
         # create connection url
         url = f"{self._remote}/stimula/1.0/{path}"
 
@@ -126,10 +126,6 @@ class Invoker:
         # set bearer token
         if send_token:
             headers["Authorization"] = f"Bearer {self._token}"
-
-        # set database as host header, the odoo dbfilter uses this to route the request to the correct database
-        if database:
-            headers["Host"] = database
 
         # post data to the url
         response = requests.post(url, headers=headers, params=params, data=data)

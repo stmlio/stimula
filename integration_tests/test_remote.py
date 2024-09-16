@@ -1,15 +1,18 @@
+import sys
 from unittest.mock import patch
 
-from integration_tests.test_local import call_main
+from stimula.cli.cli import main
 
-REMOTE = 'http://localhost:8069/'
-DB_NAME = 'beauty'
+# REMOTE = 'http://localhost:8069'
+# DB_NAME = 'beauty8'
+REMOTE = 'https://stmlio-stimula-odoo-dev-15309120.dev.odoo.com/'
+DB_NAME = 'stmlio-stimula-odoo-dev-15309120'
 DB_USER = 'admin'
 DB_PASS = 'admin'
 
 
 def test_auth():
-    call_main(f'stimula auth -r {REMOTE} -d {DB_NAME} -u {DB_USER} -p {DB_PASS}')
+    call_main(f'stimula auth -r {REMOTE} -d {DB_NAME} -u {DB_USER} -p {DB_PASS} -V')
 
 
 # make stimula believe it's in TTY mode, even though it's started from test runner
@@ -26,5 +29,21 @@ def test_pipe_single_file():
 
 
 @patch('sys.stdin.isatty', return_value=True)
-def _test_post_multiple_files(mock_isatty):
+def test_post_multiple_files(mock_isatty):
     call_main(f'stimula post -r {REMOTE} -t res_users res_partner -f csv/res_users.csv csv/res_partner.csv -e IUE')
+
+
+def call_main(cmd):
+    # Backup the original sys.argv
+    original_argv = sys.argv
+
+    # Simulate command-line arguments
+    sys.argv = cmd.split()
+
+    # Call main() and capture the result
+    result = main()
+
+    # Restore the original sys.argv
+    sys.argv = original_argv
+
+    assert result == 0
