@@ -132,10 +132,7 @@ class Invoker:
 
         # if the response is not 200, raise an exception
         if response.status_code != 200:
-            try:
-                raise Exception(f"Request failed: {response.json()['msg']}\nRemote trace: {response.json()['trace']}")
-            except:
-                raise Exception(f"Request failed: {response.text}")
+            self._raise_error(response)
 
         return response
 
@@ -151,9 +148,13 @@ class Invoker:
 
         # if the response is not 200, raise an exception
         if response.status_code != 200:
-            try:
-                raise Exception(f"Request failed: {response.json()['msg']}\nRemote trace: {response.json()['trace']}")
-            except:
-                raise Exception(f"Request failed: {response.text}")
+            self._raise_error(response)
 
         return response
+
+    def _raise_error(self, response):
+        try:
+            response_json = response.json()
+        except:
+            raise Exception(f"Request failed: {response.text}")
+        raise Exception(f"Request failed: {response_json.get('msg')}\nRemote trace: {response_json.get('trace')}")

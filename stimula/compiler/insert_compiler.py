@@ -45,8 +45,14 @@ class InsertClauseCompiler:
         # get lists of lists of attributes
         column_lists = [self._column(c) for c in mapping['columns']]
 
-        # flatten list of lists and comma separate
-        columns = ', '.join([a for attributes in column_lists for a in attributes])
+        # flatten list of lists
+        attribute_list = [a for attributes in column_lists for a in attributes]
+
+        # assert there's at least one attribute to insert
+        assert attribute_list, f'No attributes to insert in table {table}'
+
+        # comma separate
+        columns = ', '.join(attribute_list)
 
         return f'insert into {table}({columns})'
 

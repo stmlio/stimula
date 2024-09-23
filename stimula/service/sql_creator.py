@@ -57,6 +57,9 @@ class SqlCreator:
         # Create a dictionary with unique column headers as keys and values as values. We'll need these for all query types.
         unique_value_dict = self._create_unique_value_dict(mapping, row)
 
+        # raise error if there are no unique values
+        assert unique_value_dict, 'Header must have at least one unique column'
+
         # Create a dictionary with other column headers as keys and values as values.
         non_unique_value_dict = self._create_non_unique_value_dict(mapping, row)
 

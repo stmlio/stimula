@@ -85,6 +85,15 @@ def test_create_sql_row_insert_skip_nan(books, meta, lexer):
 
     assert result == expected
 
+def test_create_sql_row_insert_empty_row_must_fail(books, meta, lexer):
+    table_name = 'books'
+    header = 'title, authorid(name)'
+    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    row = pd.Series([0, NaN, NaN], index=['__line__', 'title', 'authorid(name)'])
+
+    with pytest.raises(AssertionError):
+        InsertSqlCreator()._create_sql_row(mapping, row)
+
 
 def test_create_sql_row_update(books, meta, lexer):
     table_name = 'books'
