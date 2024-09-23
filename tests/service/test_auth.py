@@ -80,7 +80,7 @@ def test_cipher_length_always_the_same(auth):
 
 
 def test_authenticate_expired_token(db_params):
-    auth = TestAuth(lambda: 'secret', lifetime_function=lambda: 0)
+    auth = TestAuth(lambda db: 'secret', lifetime_function=lambda db: 0)
     # create token
     token = auth.authenticate(db_params['database'], db_params['user'], db_params['password'])
     # expect ExpiredSignatureError

@@ -15,7 +15,7 @@ from stimula.header.csv_header_parser import HeaderParser
 
 
 class TestAuth(Auth):
-    def __init__(self, secret_key_function, lifetime_function=lambda: 900):
+    def __init__(self, secret_key_function, lifetime_function=lambda db: 900):
         super().__init__(secret_key_function, lifetime_function)
 
     def _validate_submitted_credentials(self, database, username, password):
@@ -45,7 +45,7 @@ def url(db_params):
 
 @pytest.fixture
 def auth(db_params):
-    auth = TestAuth(lambda: 'secret')
+    auth = TestAuth(lambda db: 'secret')
     auth.authenticate(db_params['database'], db_params['user'], db_params['password'])
     return auth
 

@@ -1,4 +1,5 @@
 import glob
+import os
 import sys
 from unittest.mock import patch
 
@@ -15,6 +16,9 @@ DB_PASS = 'admin'
 def test_auth():
     call_main(f'stimula auth -r {REMOTE} -d {DB_NAME} -u {DB_USER} -p {DB_PASS} -V')
 
+def test_auth_with_env_and_token_values():
+    os.environ['STIMULA_REMOTE'] = REMOTE
+    call_main(f'stimula auth -r -p {DB_PASS} -V')
 
 # make stimula believe it's in TTY mode, even though it's started from test runner
 @patch('sys.stdin.isatty', return_value=True)

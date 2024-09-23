@@ -18,7 +18,7 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
 def google_authenticate(credentials_file: str):
     # get folder name
-    assert os.path.exists(credentials_file), f'Credentials file {credentials_file} not found in folder {os.getcwd()}. Please provide a valid Google credentials file.'
+    assert os.path.exists(credentials_file), f'Credentials file {credentials_file} not found in folder {os.getcwd()}. Please provide a valid Google credentials file. Browse to https://console.cloud.google.com/apis/credentials to create one.'
     flow = InstalledAppFlow.from_client_secrets_file(credentials_file, SCOPES)
     creds = flow.run_local_server(port=8080)
 

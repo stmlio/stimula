@@ -29,7 +29,7 @@ class Auth(ABC):
         # decode token, without verifying the signature
         payload = jwt.decode(token, options={"verify_signature": False})
         # return database and username for easy re-authentication
-        return payload['database'], payload['username']
+        return payload.get('database'), payload.get('username')
 
     def authenticate(self, database, username, password):
         # validate submitted credentials and obtain user ID to store in token
