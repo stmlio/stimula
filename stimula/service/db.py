@@ -665,10 +665,15 @@ class DB:
         # combine completed and failed lists
         all_results = completed + failed
 
-        # sort by line_number
-        all_results.sort(key=lambda x: x.line_number)
+        # set delete queries apart, because they don't have line numbers
+        deleted = [result for result in all_results if result.operation_type == OperationType.DELETE]
+        insert_and_updates = [result for result in all_results if result.operation_type != OperationType.DELETE]
 
-        return all_results
+        # sort by line_number
+        insert_and_updates.sort(key=lambda x: x.line_number)
+
+        # append deleted to the end
+        return insert_and_updates + deleted
 
 
     def set_context(self, url, password):
