@@ -76,7 +76,7 @@ class StimulaCLI:
     def parse_args(self):
         parser = argparse.ArgumentParser(description='stimula - The STML CLI')
         parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose', 'google'])
-        parser.add_argument('-r', '--remote', help='Remote API URL')
+        parser.add_argument('-r', '--remote', help='Remote API URL',  nargs='?', const=os.getenv('STIMULA_REMOTE'))
         parser.add_argument('-H', '--host', help='Database host', default='localhost')
         parser.add_argument('-P', '--port', help='Database port', type=int, default=5432)
         parser.add_argument('-d', '--database', help='Database name')
@@ -223,10 +223,20 @@ class StimulaCLI:
         if not args.password:
             # hide password input
             args.password = getpass.getpass(f'Enter password for {args.user}@{args.database}: ')
+
         # authenticate and set token
         args.token = invoker.auth(args.database, args.user, args.password)
+
         # write token to local file
         self._write_token_to_file(args.token)
+
+        # set SECRET_KEY in environment if provided
+        if args.key:
+            os.environ['STIMULA_KEY'] = args.key
+
+        # set REMOTE in environment if provided
+        if args.remote:
+            os.environ['STIMULA_REMOTE'] = args.remote
 
 
     def _transpose_stdin_stdout(self):
@@ -307,7 +317,7 @@ class StimulaCLI:
             all_rows = '\n'.join([f'Line: {row["line_number"]} Error: {row["error"]}' for row in result.get('rows', []) if not row.get('success', False)])
         else:
             # report all rows
-            all_rows = '\n'.join([f'File: {row["context"]} Line: {row["line_number"]} Success: {row.get("success", False)} Error: {row.get("error", "")} Query: {row["query"]}' for row in result.get('rows', [])])
+            all_rows = '\n'.join([f'File: {row.get("context", "N/A")} Line: {row["line_number"]} Success: {row.get("success", False)} Error: {row.get("error", "N/A")} Query: "{row["query"]}"' for row in result.get('rows', [])])
 
 
         return (report_failed if total_failed > 0 else '') + (report_found if total_success == 0 else report_success) + ('\n' + all_rows if all_rows else '')
