@@ -50,6 +50,7 @@ from io import StringIO
 import pandas as pd
 
 from stimula.cli import local, remote
+from stimula.cli.anonymizer import Anonymizer
 from stimula.cli.file_source import FileSource
 from stimula.cli.google_source import GoogleSource, google_authenticate
 
@@ -75,7 +76,7 @@ class StimulaCLI:
 
     def parse_args(self):
         parser = argparse.ArgumentParser(description='stimula - The STML CLI')
-        parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose', 'google'])
+        parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose', 'google', 'anonymize'])
         parser.add_argument('-r', '--remote', help='Remote API URL',  nargs='?', const=os.getenv('STIMULA_REMOTE'))
         parser.add_argument('-H', '--host', help='Database host', default='localhost')
         parser.add_argument('-P', '--port', help='Database port', type=int, default=5432)
@@ -106,6 +107,11 @@ class StimulaCLI:
         if args.command == 'transpose':
             # transpose stdin to stdout and exit
             self._transpose_stdin_stdout()
+            return
+
+        if args.command == 'anonymize':
+            # transpose stdin to stdout and exit
+            self._anonymize_stdin_stdout()
             return
 
         if args.command == 'google':
@@ -246,6 +252,12 @@ class StimulaCLI:
         df = pd.read_csv(sys.stdin, header=None)
         # transpose the dataframe and write to stdout
         df.T.to_csv(sys.stdout, header=False, index=False)
+
+    def _anonymize_stdin_stdout(self):
+        # validate we have stdin
+        assert not sys.stdin.isatty(), 'No input provided, use piping to provide input.'
+        # anonymize the dataframe
+        Anonymizer().anonymize(sys.stdin, sys.stdout)
 
     def _read_token_from_file(self, args):
         # try to read token from local file if not provided in arguments
