@@ -35,6 +35,7 @@ if [ "$(docker ps -q -f name=$ODOO_CONTAINER_NAME)" ]; then
     docker exec -it $ODOO_CONTAINER_NAME bash -c "pip install --force-reinstall $CUSTOM_LIBRARY_PATH/dist/*.whl"
 else
     echo "Container $ODOO_CONTAINER_NAME is not running."
+    exit 1
 fi
 echo "Library built and installed successfully."
 
