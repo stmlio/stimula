@@ -48,6 +48,17 @@ def test_post_with_wildcard(mock_isatty):
     call_main(f'stimula post -k {STIMULA_KEY} -f {paths} -e IUE -V')
 
 
+def test_anonymize():
+    # Open a file to simulate piping input
+    filename = '../pgs/customer.csv'
+
+    # skip test if filename does not exist
+    if not glob.glob(filename):
+        print (f"Skipping test_anonymize because {filename} does not exist")
+    with open(filename, 'r') as f:
+        with patch('sys.stdin', f):
+            call_main(f'stimula anonymize -V')
+
 
 def call_main(cmd):
     # Backup the original sys.argv
