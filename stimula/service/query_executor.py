@@ -65,15 +65,15 @@ class SimpleQueryExecutor(QueryExecutor):
         # Get the number of affected rows
         rowcount = cursor.rowcount
 
-        # verify row was inserted
+        # verify row was affected
         if rowcount == 0:
-            error = 'No row was inserted'
+            error = 'No row was affected'
             return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, self.context, error=error)
 
         # verify no more than one row was inserted
         if rowcount > 1:
             # we must not commit the transaction
-            error = "More than one row was inserted, do not commit."
+            error = "More than one row was affected, do not commit."
             return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, self.context, error, True)
 
         result = ExecutionResult(self.line_number, self.operation_type, True, rowcount, self.table_name, self.query, self.params, self.context)
@@ -108,9 +108,9 @@ class DependentQueryExecutor(QueryExecutor):
         result = cursor.fetchone()
         rowcount_0 = cursor.rowcount
 
-        # verify row was inserted
+        # verify row was affected
         if rowcount_0 == 0:
-            _logger.warning("No row was inserted. Query: %s, Params: %s" % (query_0, params_0))
+            _logger.warning("No row was affected. Query: %s, Params: %s" % (query_0, params_0))
             execution_result = ExecutionResult(self.line_number, self.operation_type, False, rowcount_0, self.table_name, self.query, params_0, self.context)
             # skip execution of dependent query
             return execution_result
@@ -118,7 +118,7 @@ class DependentQueryExecutor(QueryExecutor):
         # verify no more than one row was inserted
         if rowcount_0 > 1:
             # raise exception, bec/ we must not commit the transaction
-            raise ValueError("More than one row was inserted. Inserts: %s, Query: %s, Params: %s" % (rowcount_0, query_0, params_0))
+            raise ValueError("More than one row was affected. Inserts: %s, Query: %s, Params: %s" % (rowcount_0, query_0, params_0))
 
         execution_result = ExecutionResult(self.line_number, self.operation_type, True, rowcount_0, self.table_name, self.query, params_0, self.context)
 
