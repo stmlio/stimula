@@ -44,11 +44,15 @@ class SqlCreator:
         for i in range(len(diffs)):
             row = diffs.iloc[i]
 
-            # create query for row
-            operation_type, query, value_dict = self._create_sql_row(mapping, row)
-
             # return line number, depends on operation type
             line_number = self._get_line_number(row)
+
+            try:
+                # create query for row
+                operation_type, query, value_dict = self._create_sql_row(mapping, row)
+            except Exception as e:
+                # raise exception with line number
+                raise Exception(f'Error in line {line_number+2}, {[", ".join([str(c) for c in row])]}: {str(e)}')
 
             # yield query and split columns
             yield SimpleQueryExecutor(line_number, operation_type, mapping['table'], query, value_dict, context)
