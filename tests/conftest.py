@@ -154,7 +154,10 @@ def ir_model_data(cnx):
 
         external_ids = ({"res_id": 1, "name": "11111", "module": "netsuite_books", "model": "books"},
                         {"res_id": 2, "name": "22222", "module": "netsuite_books", "model": "books"},
-                        {"res_id": 3, "name": "33333", "module": "netsuite_books", "model": "books"})
+                        {"res_id": 3, "name": "33333", "module": "netsuite_books", "model": "books"},
+                        {"res_id": 4, "name": "44444", "module": "netsuite_books", "model": "books"},
+                        {"res_id": 5, "name": "55555", "module": "netsuite_books", "model": "books"},
+                        {"res_id": 6, "name": "66666", "module": "netsuite_books", "model": "books"})
 
         for line in external_ids:
             cr.execute("INSERT INTO ir_model_data(res_id, name, module, model) VALUES(%(res_id)s, %(name)s, %(module)s, %(model)s)", line)
