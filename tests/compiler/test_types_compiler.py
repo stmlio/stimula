@@ -55,6 +55,7 @@ def test_dtypes(books, lexer, meta):
     expected = {'date': 'object',
                 'decimal': 'float',
                 'float': 'float',
+                'jsonb': 'object',
                 'name': 'string',
                 'number': 'Int64',
                 'property_id': 'Int64',

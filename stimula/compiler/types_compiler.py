@@ -94,9 +94,12 @@ class TypesCompiler:
         if 'key' in column:
             result['read_csv_converter'] = dictionary_converter(dtype, column['key'])
 
-        # set the dtype, but only if there's no converter to read CSV, because pandas ignores the dtype with a warning if a converter is set
-        if 'read_csv_converter' not in result:
-            result['read_csv_dtype'] = dtype
+        # if type is text and there's no read_csv_converter yet, the default is to strip trailing spaces
+        if dtype == 'string' and 'read_csv_converter' not in result:
+            result['read_csv_converter'] = strip_trailing_spaces
+
+        # set the dtype
+        result['read_csv_dtype'] = dtype
 
         return result
 
@@ -161,6 +164,10 @@ class TypesCompiler:
         attribute_type = attributes[0].get('type')
         return attribute_type == 'date' or attribute_type == 'timestamp'
 
+
+def strip_trailing_spaces(value):
+    # strip spaces from string values
+    return value.strip() if isinstance(value, str) else value
 
 def json_to_dict(json_str):
     # accept json strings that come from CSV using single quotes.

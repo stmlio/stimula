@@ -498,7 +498,7 @@ def test_read_from_request(db, books, meta):
 
     df = db._read_from_request(mapping, body, 0)
 
-    dtypes = {'title': 'string', 'authorid(name)': 'string'}
+    dtypes = {'authorid(name)': 'string'}
     expected = pd.DataFrame([
         ['Emma', 0, 'Jane Austen'],
         ['War and Peace', 1, 'Leo Tolstoy'],
@@ -513,6 +513,24 @@ def test_read_from_request(db, books, meta):
 
     assert df.equals(expected)
 
+def test_read_from_request_trailing_space(db, books, meta):
+    # test that trailing spaces are removed from the input
+    table = 'books'
+    header = 'title[unique=true], authorid(name)'
+    mapping = HeaderParser(meta, table).parse_csv(header)
+    body = '''
+        Emma , Jane Austen 
+    '''
+    df = db._read_from_request(mapping, body, 0)
+
+    dtypes = {'authorid(name)': 'string'}
+    expected = pd.DataFrame([
+        ['Emma', 0, 'Jane Austen'],
+    ],
+        columns=['title', '__line__', 'authorid(name)'],
+    ).astype(dtypes).set_index('title')
+
+    assert df.equals(expected)
 
 def test_read_from_request_detect_duplicate(db, books, meta):
     # verify that duplicates in the input halts the import

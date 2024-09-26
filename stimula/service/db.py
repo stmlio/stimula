@@ -366,7 +366,6 @@ class DB:
             index_col=initial_index_columns,
             skipinitialspace=True,
             skiprows=skiprows,
-            dtype=dtype,
             # skip the empty column names that we renamed to skip, skip1, etc
             usecols=initial_usecols,
             parse_dates=parse_dates,
@@ -374,6 +373,14 @@ class DB:
             na_values=[''],
             keep_default_na=False
         )
+
+        # iterate columns types and convert to the correct type.
+        # Need to do this after reading, because pd sets converter results to type object
+        for column, type in dtype.items():
+            # skip setting index types
+            if column in df.columns:
+                # convert column to the correct type
+                df[column] = df[column].astype(type)
 
         df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, index_columns, converters)
 
