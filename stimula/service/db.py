@@ -10,6 +10,7 @@ import os
 import re
 import sys
 from io import StringIO
+from itertools import chain
 
 import pandas as pd
 import psycopg2
@@ -228,7 +229,7 @@ class DB:
                       'delete': len([er for er in execution_results if er.operation_type == OperationType.DELETE and not er.success])}
 
         # list execution results
-        rows = [er.to_dict(execute) for er in execution_results]
+        rows = list(chain(*[er.report(execute) for er in execution_results]))
         result['rows'] = rows
 
         return result

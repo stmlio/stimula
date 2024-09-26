@@ -323,16 +323,22 @@ class StimulaCLI:
             report_success += f'{success.get("insert", 0)} inserts, {success.get("update", 0)} updates, {success.get("delete", 0)} deletes'
 
 
-        all_rows = ''
-        if not verbose:
-            # report errors
-            all_rows = '\n'.join([f'Line: {row["line_number"]} Error: {row["error"]}' for row in result.get('rows', []) if not row.get('success', False)])
-        else:
-            # report all rows
-            all_rows = '\n'.join([f'File: {row.get("context", "N/A")} Line: {row["line_number"]} Success: {row.get("success", False)} Error: {row.get("error", "N/A")} Query: "{row["query"]}"' for row in result.get('rows', [])])
-
+        all_rows = '\n'.join([self._report_row(row, verbose) for row in result.get('rows', []) if not row.get('success', False) or verbose])
 
         return (report_failed if total_failed > 0 else '') + (report_found if total_success == 0 else report_success) + ('\n' + all_rows if all_rows else '')
+
+    def _report_row(self, row, verbose):
+        if not verbose:
+            # report errors
+            result = f'Line: {row["line_number"]} Error: {row["error"]}'
+        else:
+            result = f'File: {row.get("context", "N/A")}'
+            # delete statements don't have a line number
+            if row.get("line_number"):
+                result += f' Line: {row["line_number"]}'
+            result += f' Success: {row.get("success", False)} Error: {row.get("error", "N/A")} Query: "{row["query"]}"'
+
+        return result
 
 
 def validate_flags(value):
