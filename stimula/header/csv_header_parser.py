@@ -114,17 +114,19 @@ class HeaderParser(Parser):
                 else:
                     # this may be an extension relation, we need to resolve the foreign key table and column
 
-                    # find foreign table name in cell and remove the attribute
-                    if 'table' not in cell_or_foreign_key:
-                        raise ValueError(f"Column '{attribute['name']}' is not a foreign key and no 'table' specified in modifiers")
-                    table = self._resolve_table(modifiers['table'])
-                    del modifiers['table']
+                    # find foreign table name in cell, or default to Odoo's ir_model_data table
+                    table_name = modifiers.get('table', 'ir_model_data')
+                    # resolve the table
+                    table = self._resolve_table(table_name)
+                    # remove the attribute because we don't need it as a modifier
+                    if 'table' in modifiers:
+                        del modifiers['table']
 
-                    # find referred column in cell and remove the attribute
-                    if 'name' not in modifiers:
-                        raise ValueError(f"Column '{attribute['name']}' is not a foreign key and no referred 'name' specified in modifiers")
-                    column_name = modifiers['name']
-                    del modifiers['name']
+                    # find referred column in cell, or default to Odoo's res_id column
+                    column_name = modifiers.get('name', 'res_id')
+                    # remove the attribute because we don't need it as a modifier
+                    if 'name' in modifiers:
+                        del modifiers['name']
 
                     if column_name not in table.columns:
                         raise ValueError(f"Column '{column_name}' not found in table '{table}'")

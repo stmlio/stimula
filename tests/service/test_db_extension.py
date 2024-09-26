@@ -69,6 +69,26 @@ def test_insert_unique_extension(db, books, ir_model_data, context):
 
     assert df.equals(expected)
 
+def test_insert_extension_defaults(db, books, ir_model_data):
+    # test that we can take defaults for table and name
+    table_name = 'books'
+    header = 'title[unique=true], authorid(name), bookid(name)[id=bookid: qualifier=netsuite_books]'
+    body = '''
+        Pride and Prejudice, Jane Austen, 12345 
+    '''
+    # post
+    df = db.post_table_get_sql(table_name, header, None, body, insert=True, context='my table')
+
+    dtypes = {'sql': 'string', 'title': 'string', 'name': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
+    expected = pd.DataFrame([
+        ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
+        ['insert into ir_model_data (name, module, model, res_id) values (:name_1, :module, :model, :res_id)', None, None, '12345', 'netsuite_books', 'books', None]
+    ],
+        columns=['sql', 'title', 'name', 'name_1', 'module', 'model', 'res_id']
+    ).astype(dtypes)
+
+    assert df.equals(expected)
+
 
 def test_update_unique_extension(db, books, ir_model_data, context):
     # test that we can update a record by its unique extension
