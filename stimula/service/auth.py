@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 
 class Auth(ABC):
     # set the secret key during instantiation
-    def __init__(self, secret_key_function, lifetime_function=lambda database: 900):
+    def __init__(self, secret_key_function, lifetime_function=lambda database: 24 * 3600):
         # secret_key function must be set.
         # We can't evaluate the secret key in the constructor because we don't have a database connection during instantiation.
         assert secret_key_function, 'Secret key must be set'
