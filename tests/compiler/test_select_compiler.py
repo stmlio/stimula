@@ -89,7 +89,7 @@ def test_extension(books, meta, context, ir_model_data):
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
     mapping = HeaderParser(meta, table).parse_csv(header)
     result = SelectCompiler().compile(mapping)
-    expected = "select books.title, ir_model_data.name from books left join ir_model_data on books.bookid = ir_model_data.res_id and ir_model_data.model = 'books' and ir_model_data.module = 'netsuite_books' order by books.title"
+    expected = "select books.title, ir_model_data.name from books join ir_model_data on books.bookid = ir_model_data.res_id and ir_model_data.model = 'books' and ir_model_data.module = 'netsuite_books' order by books.title"
     assert result == expected
 
 
@@ -101,5 +101,5 @@ def test_extension_in_foreign_table(books, meta, context, ir_model_data):
     result = SelectCompiler().compile(mapping)
     expected = ("select books.title, ir_model_data.name from books "
                 "left join authors on books.authorid = authors.author_id "
-                "left join ir_model_data on authors.author_id = ir_model_data.res_id and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' order by books.title")
+                "join ir_model_data on authors.author_id = ir_model_data.res_id and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' order by books.title")
     assert result == expected

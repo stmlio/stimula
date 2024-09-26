@@ -151,6 +151,8 @@ class JoinClauseCompiler:
 
             # if this is an Odoo style extension relation, then we need to filter by qualifier (module) and table (model)
             if 'qualifier' in foreign_key:
+                # for an extension table, we should do a double join instead of a left join, because we want to skip records that don't have an extension record
+                join_clause = join_clause.replace(' left join ', ' join ')
                 qualifier = foreign_key['qualifier']
                 # assume for now that alias is the table name. This is fine as long as we're not joining the same table multiple times
                 table_name = SelectCompiler().get_model_name(alias)
