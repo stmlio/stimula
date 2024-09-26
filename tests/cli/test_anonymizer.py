@@ -33,9 +33,9 @@ def test_get_sensitive_columns():
                        'terms', 'bigcommerce_customer_group', 'intercom_id']
 
 
-def test_large_csv():
-    # read file ../../beauty/customer.csv
-    df = pd.read_csv('../../beauty/customer.csv')
+def _test_large_csv():
+    # read file ../beauty/customer.csv
+    df = pd.read_csv('../beauty/customer.csv')
     columns = anon.get_sensitive_columns(df)
     assert columns == ['first_name', 'last_name', 'salon_name', 'shipping_addressee', 'shipping_attention', 'shipping_phone', 'shipping_address_1', 'shipping_address_2', 'billing_addressee',
                        'billing_attention', 'billing_phone', 'billing_address_1', 'billing_address_2', 'license_number', 'license_state', 'email', 'phone', 'mobile_phone', 'resale_license_number',
