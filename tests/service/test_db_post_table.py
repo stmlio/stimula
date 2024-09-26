@@ -8,9 +8,9 @@ def test_post_table_update_non_empty_string_to_empty(db, books, context):
     '''
     df = db.post_table_get_sql('books', 'title[unique=true], description', None, body, update=True, execute=True)
 
-    dtypes = {'rows': pd.Int64Dtype(), 'sql': 'string', 'title': 'string', 'description': pd.Int64Dtype()}
+    dtypes = {'rows': pd.Int64Dtype(), 'sql': 'string', 'title': 'string', 'description': 'string'}
     expected = pd.DataFrame([
-        [1, 'update books set description = :description where books.title = :title', 'Emma', None]
+        [1, 'update books set description = :description where books.title = :title', 'Emma', '']
     ],
         columns=['rows', 'sql', 'title', 'description']
     ).astype(dtypes)

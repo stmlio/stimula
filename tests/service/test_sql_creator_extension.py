@@ -2,7 +2,7 @@ import pandas as pd
 
 from stimula.compiler.alias_compiler import AliasCompiler
 from stimula.header.csv_header_parser import HeaderParser
-from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator
+from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
 
 '''
 This script tests sql creators for extension tables. An extension table is a table that is used to extend another table with additional attributes.
@@ -15,6 +15,7 @@ This script tests generating queries for inserts, updates, and deletes for the i
 
 
 def test_insert_sql_creator_external_id(books, meta):
+    # test that we can insert a record into an extension table
     table = 'books'
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
     mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
@@ -96,3 +97,23 @@ def test_update_sql_creator_unique_external_id(books, meta):
     # compare
     assert actual == expected
 
+def test_delete_sql_creator_external_id(books, meta):
+    # test that we can insert a record into an extension table
+    table = 'books'
+    header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
+    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+
+    diff = pd.DataFrame([
+        [0, 'Pride and Prejudice', '12345'],
+    ], columns=['__line__', 'title[unique=true]', 'bookid(name)'])
+
+    # get queries
+    deletes = DeleteSqlCreator().create_sql(mapping, diff)
+    actual = list(deletes)[0].queries()
+
+    expected = [('delete from books where books.title = :title returning id', {'name': '12345', 'title': 'Pride and Prejudice'}),
+                ('delete from ir_model_data where name = :name and module = :module and model = :model and res_id = :res_id',
+                 {'model': 'books', 'module': 'netsuite_books', 'name': '12345', 'res_id': None})]
+
+    # compare
+    assert actual == expected

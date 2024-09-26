@@ -44,6 +44,19 @@ class HeaderCompiler:
         # remove empty columns
         return [c for c in columns if c]
 
+    def compile_list_non_unique_root_extension(self, mapping):
+        # return list of non-unique columns that are root extension columns
+        if 'columns' not in mapping:
+            return []
+        # remove unique columns, also remove 'skip' columns because we don't want to write them to DB
+        columns = [self._column(c) for c in mapping['columns'] if not c.get('unique', False) and not c.get('skip', False) and self._is_root_extension(c)]
+        # remove empty columns
+        return [c for c in columns if c]
+
+    def _is_root_extension(self, column):
+        # return true if this is an extension column
+        return any([a for a in column.get('attributes', []) if a.get('foreign-key',{}).get('extension', False)])
+
     def compile_list_deduplicate(self, mapping):
         if 'columns' not in mapping:
             return []

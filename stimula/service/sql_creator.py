@@ -104,6 +104,20 @@ class SqlCreator:
 
         return non_unique_value_dict
 
+    def _create_non_unique_root_extension_value_dict(self, mapping, row):
+        # when we delete a record with an extension on the root table (not on a foreign key table),
+        # then we need to delete the extension record as well. If the extension is unique, then
+        # the delete statement will already have the extension's name value, but if it's not unique,
+        # then this method ensures the value is included.
+
+        # get non-unique headers
+        non_unique_headers = HeaderCompiler().compile_list_non_unique_root_extension(mapping)
+
+        # create dictionary with non-unique column headers as keys and values as values
+        non_unique_value_dict = {header: row[header] for header in non_unique_headers}
+
+        return non_unique_value_dict
+
     def _filter_mapping(self, mapping, value_dict):
         # filter columns by those that have a value in value_dict
 
@@ -206,7 +220,8 @@ class InsertSqlCreator(SqlCreator):
 
                 # create a separate query for the extension
                 dependent_query = self._create_extension_insert_query(mapping, query_executor.params)
-                dependent_query_executor = DependentQueryExecutor(query_executor.line_number, query_executor.operation_type, mapping['table'], context, (query_executor.query, query_executor.params), dependent_query)
+                dependent_query_executor = DependentQueryExecutor(query_executor.line_number, query_executor.operation_type, mapping['table'], context, (query_executor.query, query_executor.params),
+                                                                  dependent_query)
                 yield dependent_query_executor
 
     def _create_non_unique_value_dict(self, mapping, row):
@@ -226,27 +241,11 @@ class InsertSqlCreator(SqlCreator):
         return OperationType.INSERT, InsertCompiler().compile(mapping)
 
     def _create_extension_insert_query(self, mapping, param):
-        # get extension foreign keys
-        extension_foreign_keys = [a['foreign-key'] for c in mapping['columns'] for a in c.get('attributes', []) if a.get('foreign-key', {}).get('extension')]
+        # get table, name parameter name and values
+        table, name_parameter_name, values = ExtensionValueHelper().get_extension_parameter_values(mapping, param)
 
-        # only one extension is supported for now
-        assert len(extension_foreign_keys) == 1, f'Only one extension is supported, found: {len(extension_foreign_keys)}'
-        foreign_key = extension_foreign_keys[0]
-
-        # foreign key must have a single attribute
-        assert len(foreign_key['attributes']) == 1, f'Foreign key must have a single attribute, found: {len(foreign_key["attributes"])}'
-        attribute = foreign_key['attributes'][0]
-        name_parameter_name = attribute['parameter']
-
-        table = foreign_key['table']
-        name = param[name_parameter_name]
-        qualifier = foreign_key['qualifier']
-        # TODO: replace with proper way to get the model name
-        model = mapping['table'].replace('_', '.')
-        # create query
-
+        # create insert query
         sql = f'insert into {table} (name, module, model, res_id) values (:{name_parameter_name}, :module, :model, :res_id)'
-        values = {name_parameter_name: name, 'module': qualifier, 'model': model, 'res_id': None}
         return sql, values
 
     def _get_line_number(self, row):
@@ -255,6 +254,7 @@ class InsertSqlCreator(SqlCreator):
 
 
 class UpdateSqlCreator(SqlCreator):
+
     def _create_unique_value_dict(self, mapping, row):
         # split row in self and other
         self_row, other_row = self._split_diff_self_other(row)
@@ -340,9 +340,25 @@ class UpdateSqlCreator(SqlCreator):
 
 
 class DeleteSqlCreator(SqlCreator):
+    def create_sql(self, mapping, diffs, context=None):
+        # override to create dependent delete queries for extensions
+        for query_executor in super().create_sql(mapping, diffs, context):
+
+            # is there an extension on the root table?
+            if not ReturningClauseCompiler().compile(mapping):
+                yield query_executor
+
+            else:
+                # create a separate query for the extension
+                dependent_query = self._create_extension_delete_query(mapping, query_executor.params)
+                dependent_query_executor = DependentQueryExecutor(query_executor.line_number, query_executor.operation_type, mapping['table'], context, (query_executor.query, query_executor.params),
+                                                                  dependent_query)
+                yield dependent_query_executor
+
     def _create_non_unique_value_dict(self, mapping, row):
-        # return empty dictionary, because for deletes we don't need other columns
-        return {}
+        # For deletes we don't need non-unique columns.
+        # Except, we do need extension name value, because we need to delete the extension even if it's not unique
+        return super()._create_non_unique_root_extension_value_dict(mapping, row)
 
     def _create_query(self, mapping, value_dict):
         # create query
@@ -351,3 +367,38 @@ class DeleteSqlCreator(SqlCreator):
     def _get_line_number(self, row):
         # deletes don't have a matching input row
         return None
+
+    def _create_extension_delete_query(self, mapping, param):
+        # get table, name parameter name and values
+        table, name_parameter_name, values = ExtensionValueHelper().get_extension_parameter_values(mapping, param)
+
+        # create delete query
+        sql = f'delete from {table} where name = :{name_parameter_name} and module = :module and model = :model and res_id = :res_id'
+        return sql, values
+
+
+class ExtensionValueHelper:
+    def get_extension_parameter_values(self, mapping, param):
+        # get extension foreign keys
+        extension_foreign_keys = [a['foreign-key'] for c in mapping['columns'] for a in c.get('attributes', []) if a.get('foreign-key', {}).get('extension')]
+
+        # only one extension is supported for now
+        assert len(extension_foreign_keys) == 1, f'Only one extension is supported, found: {len(extension_foreign_keys)}'
+        foreign_key = extension_foreign_keys[0]
+
+        # foreign key must have a single attribute
+        assert len(foreign_key['attributes']) == 1, f'Foreign key must have a single attribute, found: {len(foreign_key["attributes"])}'
+        attribute = foreign_key['attributes'][0]
+        name_parameter_name = attribute['parameter']
+
+        table = foreign_key['table']
+        name = param[name_parameter_name]
+        qualifier = foreign_key['qualifier']
+        # TODO: replace with proper way to get the model name
+        model = mapping['table'].replace('_', '.')
+
+        # create values map
+        values = {name_parameter_name: name, 'module': qualifier, 'model': model, 'res_id': None}
+
+        # return table, name parameter name and values
+        return table, name_parameter_name, values

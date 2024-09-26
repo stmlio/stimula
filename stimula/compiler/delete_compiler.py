@@ -4,6 +4,11 @@ This class generates delete statements based on a mapping.
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
+from itertools import chain
+
+from stimula.compiler.insert_compiler import ReturningClauseCompiler
+
+
 class DeleteCompiler:
     """
         delete from c
@@ -17,10 +22,12 @@ class DeleteCompiler:
         using_clause = UsingClauseCompiler().compile(mapping)
         where_clause = WhereClauseCompiler().compile(mapping)
         foreign_where_clause = ForeignWhereClauseCompiler().compile(mapping)
+        # in a delete statement, the foreign where clause always needs an 'and'
+        foreign_where_clause = ' and ' + foreign_where_clause if foreign_where_clause else ''
+        # returning clause is needed if we need to delete from an extension table
+        returning_clause = ReturningClauseCompiler().compile(mapping)
 
-        result = f'delete from {table_name}{using_clause}{where_clause}'
-        if foreign_where_clause:
-            result += ' and ' + foreign_where_clause
+        result = f'delete from {table_name}{using_clause}{where_clause}{foreign_where_clause}{returning_clause}'
 
         return result
 
@@ -124,35 +131,42 @@ class ForeignWhereClauseCompiler:
         table_name = mapping['table']
         clauses = [self._column(c, table_name) for c in mapping['columns']]
 
-        # filter and flatten
-        filtered_clauses = [clause for cell in clauses for clause in cell if clause]
-        if not filtered_clauses:
-            return ''
-        return ' and '.join(filtered_clauses)
+        return ' and '.join(chain(*clauses))
 
     def _column(self, column, table):
-        # no need to list non-unique columns as 'using' table
+        # no need to list non-unique columns as 'using' table when creating a delete query
         if not column.get('unique', False):
             return []
 
-        where_clause_columns = self._attributes(column['attributes'], table, True)
-        return [c for c in where_clause_columns if c]
+        return self._attributes(column['attributes'], table, True)
 
     def _attributes(self, attributes, source_alias, is_root):
-        return [self._attribute(attribute, source_alias, is_root) for attribute in attributes]
+        return chain(*[self._attribute(attribute, source_alias, is_root) for attribute in attributes])
 
     def _attribute(self, attribute, alias, is_root_table):
         if not 'foreign-key' in attribute:
 
-            # only add where clauses for joined tables, but do register for alias
+            # no where clause needed for root table
             if is_root_table:
-                return ''
+                return []
+
+            # terminate foreign key with an equation
             parameter_name = attribute.get('parameter', f'{attribute["name"]}')
-            return f'{alias}.{attribute["name"]} = :{parameter_name}'
+            return [f'{alias}.{attribute["name"]} = :{parameter_name}']
 
         foreign_key = attribute['foreign-key']
         target_name = foreign_key['table']
         target_alias = foreign_key.get('alias', target_name)
 
         # recurse
-        return ' and '.join(self._attributes(foreign_key['attributes'], target_alias, False))
+        where_clause = self._attributes(foreign_key['attributes'], target_alias, False)
+
+        # add extension conditions if this is the root of a delete query
+        if is_root_table and foreign_key.get('extension'):
+            # assume for now that the alias is the table name. This is fine as long as we're not joining the same table multiple times
+            model = alias.replace('_', '.')
+            extension_clause = [f"{target_alias}.module = '{foreign_key['qualifier']}'",
+                                f"{target_alias}.model = '{model}'"]
+            where_clause = chain(where_clause, extension_clause)
+
+        return where_clause
