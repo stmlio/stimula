@@ -240,7 +240,7 @@ class ReturningClauseCompiler:
         # assert there's no more than one
         assert len(non_empty_clauses) == 1, f'Can only return a single extension id, found: {non_empty_clauses}'
 
-        return ' returning ' + non_empty_clauses[0]
+        return ' returning ' + mapping['table'] + '.' + non_empty_clauses[0]
 
     def _column(self, column):
         return self._attributes(column.get('attributes', []))

@@ -189,7 +189,7 @@ def test_delete_unique_extension_skip_null(db, books, ir_model_data, context):
     dtypes = {'rows': 'Int64', 'sql': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
     expected = pd.DataFrame([
         [1,
-         'delete from books using ir_model_data where books.bookid = ir_model_data.res_id and ir_model_data.name = :name_1 and ir_model_data.module = \'netsuite_books\' and ir_model_data.model = \'books\' returning bookid',
+         'delete from books using ir_model_data where books.bookid = ir_model_data.res_id and ir_model_data.name = :name_1 and ir_model_data.module = \'netsuite_books\' and ir_model_data.model = \'books\' returning books.bookid',
          '11111', None, None, None],
         [1, 'delete from ir_model_data where name = :name_1 and module = :module and model = :model and res_id = :res_id', '11111', 'netsuite_books', 'books', 1]
     ],

@@ -175,8 +175,8 @@ class ExecutionResult:
     def __str__(self):
         return f"Type: {self.operation_type}, Success: {self.success}, Rowcount: {self.rowcount}, Table: {self.table_name}, Query: {self.query}, Params: {self.params}"
 
-    def to_dict(instance, execute):
+    def report(instance, execute):
         if execute:
-            return {key: value for key, value in vars(instance).items() if value is not None and key != 'block_commit'}
+            return [{key: value for key, value in vars(instance).items() if value is not None and key != 'block_commit'}]
         else:
-            return {key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'success', 'rowcount']}
+            return [{key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'success', 'rowcount']}]
