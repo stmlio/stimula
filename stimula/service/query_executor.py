@@ -193,6 +193,6 @@ class ExecutionResult:
 
     def report(instance, execute):
         if execute:
-            return [{key: value for key, value in vars(instance).items() if value is not None and key != 'block_commit'}]
+            return [{key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'dependent_execution_result']}]
         else:
-            return [{key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'success', 'rowcount']}]
+            return [{key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'success', 'rowcount', 'dependent_execution_result']}]

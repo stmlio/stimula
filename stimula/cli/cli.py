@@ -102,6 +102,7 @@ class StimulaCLI:
         parser.add_argument('-c', '--context', nargs='+', help='Free text to match the query results, usually a source file name')
         parser.add_argument('-G', '--google_auth', nargs='?', help='Optional path of Google credentials file', const='client_secret.json')
         parser.add_argument('-g', '--google_sheet', nargs='?', help='ID of Google Sheets document')
+        parser.add_argument('-a', '--audit', action='store_true', help='Print audit trail')
         args = parser.parse_args()
         return args
 
@@ -217,7 +218,7 @@ class StimulaCLI:
                                         post_script=args.execute,
                                         context=context)
 
-            print(self._create_report(result, args.verbose))
+            print(self._create_report(result, args.audit, args.verbose))
 
 
     def _authenticate(self, args, invoker):
@@ -301,54 +302,97 @@ class StimulaCLI:
         # transpose the dataframe, dispose all but the first row and convert to csv
         args.mapping = df.T.head(1).to_csv(header=False, index=False)
 
-    def _create_report(self, result, verbose):
+    def _create_report(self, result, audit, verbose):
+        if audit:
+            return self._report_audit(result)
+        elif verbose:
+            return self._report_verbose(result)
+        else:
+            return self._report_summary(result)
+
+    def _report_summary(self, result):
         summary = result.get('summary', {})
+        total = summary.get('total', {})
 
-        # report failed
-        failed = summary.get('failed', {})
-        total_failed = failed.get('insert', 0) + failed.get('update', 0) + failed.get('delete', 0)
-        report_failed = 'Failed: '
-        if total_failed == 0:
-            report_failed += 'None\n'
+        # report summary
+        report = ''
+
+        rows = summary.get("rows", 0)
+        report += f'Rows read:  {rows}\n'
+        if rows == 0:
+            return report
+
+        operations = total.get("operations", 0)
+        report += f'Operations: {operations}\n'
+        if operations == 0:
+            return report
+
+        success = total.get('success', {})
+        report += f'Success:    {success}\n'
+
+        failed = total.get('failed', {})
+        if failed > 0:
+            report += f'Failed:     {failed}\n'
+
+        error_rows = [row for row in result.get('rows', []) if not row.get('success', False)]
+        error_report = '\n'.join([self._report_row(row, False) for row in error_rows])
+        if error_report:
+            report += f'{error_report}\n'
+
+        if summary.get('commit', False):
+            report += 'Transaction committed\n'
         else:
-            report_failed += f'{failed.get("insert", 0)} inserts, {failed.get("update", 0)} updates, {failed.get("delete", 0) } deletes\n'
+            report += 'Transaction not committed\n'
 
-        # report found
-        found = summary.get('found', {})
-        total_found = found.get('insert', 0) + found.get('update', 0) + found.get('delete', 0)
-        report_found = 'Found: '
-        if total_found == 0:
-            report_found += 'None'
-        else:
-            report_found += f'{found.get("insert", 0)} inserts, {found.get("update", 0)} updates, {found.get("delete", 0)} deletes'
 
-        # committed?
-        committed = summary.get('commit', False)
+        return report
 
-        # report success
+    def _report_verbose(self, result):
+
+        summary = result.get('summary', {})
+        total = summary.get('total', {})
+
+        # report summary
+        report = ''
+
+        report += f'Rows read:  {summary.get("rows", 0)}\n'
+        report += f'Operations: {total.get("operations", 0)}\n'
         success = summary.get('success', {})
-        total_success = success.get('insert', 0) + success.get('update', 0) + success.get('delete', 0)
-        report_success = 'Evaluated: ' if not committed else 'Committed: '
-        if total_success == 0:
-            report_success += 'None'
+        report += f'Success     {total.get("success", 0)} (insert: {success.get("insert", 0)}, update: {success.get("update", 0)}, delete: {success.get("delete", 0)})\n'
+        failed = summary.get('failed', {})
+        report += f'Failed      {total.get("failed", 0)} (insert: {failed.get("insert", 0)}, update: {failed.get("update", 0)}, delete: {failed.get("delete", 0)})\n'
+
+        error_rows = [row for row in result.get('rows', []) if not row.get('success', False)]
+        error_report = '\n'.join([self._report_row(row, True) for row in error_rows])
+
+        if error_report:
+            report += f'Errors:\n{error_report}\n'
+
+        if summary.get('commit', False):
+            report += 'Transaction committed\n'
         else:
-            report_success += f'{success.get("insert", 0)} inserts, {success.get("update", 0)} updates, {success.get("delete", 0)} deletes'
+            report += 'Transaction not committed\n'
 
+        return report
 
-        all_rows = '\n'.join([self._report_row(row, verbose) for row in result.get('rows', []) if not row.get('success', False) or verbose])
+    def _report_audit(self, result):
+        # return result with indented json layout
+        return json.dumps(result, indent=4)
 
-        return (report_failed if total_failed > 0 else '') + (report_found if total_success == 0 else report_success) + ('\n' + all_rows if all_rows else '')
 
     def _report_row(self, row, verbose):
         if not verbose:
-            # report errors
-            result = f'Line: {row["line_number"]} Error: {row["error"]}'
-        else:
-            result = f'File: {row.get("context", "N/A")}'
+            result = f'{row.get("context", "")}'
             # delete statements don't have a line number
             if row.get("line_number"):
-                result += f' Line: {row["line_number"]}'
-            result += f' Success: {row.get("success", False)} Error: {row.get("error", "N/A")} Query: "{row.get("query", "N/A")}"'
+                result += f':{row["line_number"]} - '
+            result += f'"{row.get("error", "N/A")}" '
+        else:
+            result = f'{row.get("context", "")}'
+            # delete statements don't have a line number
+            if row.get("line_number"):
+                result += f':{row["line_number"]} - '
+            result += f'"{row.get("error", "N/A")}" - Query: "{row.get("query", "N/A")}"'
 
         return result
 

@@ -51,7 +51,7 @@ class Auth(ABC):
 
     def validate_token(self, token):
         # get database from token
-        database, _ = self.get_database_and_username(token)
+        database, username = self.get_database_and_username(token)
 
         # evaluate secret key function for this database
         secret_key = self._secret_key_function(database)
@@ -71,10 +71,10 @@ class Auth(ABC):
         password = self.decrypt(secret_key, encrypted_password, salt)
 
         # validate token credentials and return resulting objects
-        result = self._validate_token_credentials(database, uid, password)
+        cnx, cr = self._validate_token_credentials(database, uid, password)
 
         # return validation result
-        return result
+        return cnx, cr, username
 
     @abstractmethod
     def _validate_submitted_credentials(self, database, username, password):

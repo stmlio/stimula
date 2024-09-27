@@ -23,7 +23,7 @@ class Invoker:
 
     def set_context(self, token):
         # set context for processing of this request
-        cnx_context.cnx, cnx_context.cr = self._auth.validate_token(token)
+        cnx_context.cnx, cnx_context.cr, cnx_context.username = self._auth.validate_token(token)
 
         # also create sqlalchemy engine, bec/ that's what pandas needs
         cnx_context.engine = create_engine('postgresql://', creator=lambda: cnx_context.cnx)

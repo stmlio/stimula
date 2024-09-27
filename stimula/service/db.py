@@ -176,7 +176,7 @@ class DB:
         execution_results = self._execute_sql(query_executors, execute, commit)
 
         # create full report
-        return Reporter().create_post_report(execution_results, execute, commit)
+        return Reporter().create_post_report([table_name], [body], [context], execution_results, execute, commit, skiprows)
 
     def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
                                              post_script=None, context=None):
@@ -204,7 +204,7 @@ class DB:
         execution_results = self._execute_sql(query_executors, execute, commit)
 
         # create full report
-        return Reporter().create_post_report( execution_results, execute, commit)
+        return Reporter().create_post_report(table_names, contents, context, execution_results, execute, commit, skiprows)
 
 
     def _convert_to_df(self, sqls, showResult):
