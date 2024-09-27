@@ -156,7 +156,7 @@ class StimulaCLI:
 
         # execute command
         if args.command == 'auth':
-            print(f'Token: {args.token}')
+            print(f'Connected as {args.user}.')
         elif args.command == 'list':
             filter = args.tables[0] if args.tables else None
             tables = invoker.list(filter)
