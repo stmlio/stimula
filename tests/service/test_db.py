@@ -3,7 +3,7 @@ import re
 
 import pandas as pd
 import pytest
-from numpy import NaN, nan, isnan
+from numpy import nan, isnan
 
 from stimula.header.csv_header_parser import HeaderParser
 from stimula.service.query_executor import SimpleQueryExecutor, OperationType
@@ -178,7 +178,7 @@ def test_post_table_get_sql_with_changes(db, books, context):
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'Catch XIII', 'Joseph Heller'],
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'A Christmas Carol', 'Charles Dickens'],
         ['update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', 'Anna Karenina', 'Joseph Heller'],
-        ['delete from books where books.title = :title', 'Catch-22', NaN],
+        ['delete from books where books.title = :title', 'Catch-22', nan],
     ],
         columns=['sql', 'title', 'name']
     ).astype(dtypes)
@@ -204,7 +204,7 @@ def test_post_table_get_sql_with_changes_with_empty_columns(db, books, context):
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'Catch XIII', 'Joseph Heller'],
         ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', 'A Christmas Carol', 'Charles Dickens'],
         ['update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', 'Anna Karenina', 'Joseph Heller'],
-        ['delete from books where books.title = :title', 'Catch-22', NaN],
+        ['delete from books where books.title = :title', 'Catch-22', nan],
     ],
         columns=['sql', 'title', 'name']
     ).astype(dtypes)
@@ -447,7 +447,7 @@ def test_post_table_get_full_report(db, books, context):
             {'line_number': 3, 'operation_type': OperationType.UPDATE, 'success': False, 'rowcount': 0, 'table_name': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'name': 'Charlie Dickens', 'title': 'David Copperfield'},
-             'error': 'No row was inserted'},
+             'error': 'No row was affected'},
             {'line_number': 5, 'operation_type': OperationType.UPDATE, 'success': True, 'rowcount': 1, 'table_name': 'books', 'context': 'my table',
              'query': 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
              'params': {'title': 'Anna Karenina', 'name': 'Joseph Heller'}},

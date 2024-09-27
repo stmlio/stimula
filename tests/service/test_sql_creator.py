@@ -1,7 +1,7 @@
 import numpy
 import pandas as pd
 import pytest
-from numpy import int64, nan, NaN
+from numpy import int64, nan
 
 from stimula.compiler.alias_compiler import AliasCompiler
 from stimula.header.csv_header_parser import HeaderParser
@@ -34,8 +34,8 @@ def test_create_sql_multiple_update_rows(meta, books, lexer):
     columns = ['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')]
 
     updates = pd.DataFrame([
-        [pd.Series([0]), 'Pride and Prejudice', 'Charles Dickens', 'Jane Austen', NaN, NaN],
-        [pd.Series([1]), 'David Copperfield', NaN, NaN, 'A novel by Charles Dickens, narrated by ...', NaN],
+        [pd.Series([0]), 'Pride and Prejudice', 'Charles Dickens', 'Jane Austen', nan, nan],
+        [pd.Series([1]), 'David Copperfield', nan, nan, 'A novel by Charles Dickens, narrated by ...', nan],
     ],
         columns=columns
     )
@@ -78,7 +78,7 @@ def test_create_sql_row_insert_skip_nan(books, meta, lexer):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
-    row = pd.Series([0, 'Pride and Prejudice', NaN], index=['__line__', 'title[unique=true]', 'authorid(name)'])
+    row = pd.Series([0, 'Pride and Prejudice', nan], index=['__line__', 'title[unique=true]', 'authorid(name)'])
     result = InsertSqlCreator()._create_sql_row(mapping, row)
 
     expected = (OperationType.INSERT, 'insert into books(title) select :title', {'title': 'Pride and Prejudice'})
@@ -89,7 +89,7 @@ def test_create_sql_row_insert_empty_row_must_fail(books, meta, lexer):
     table_name = 'books'
     header = 'title, authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
-    row = pd.Series([0, NaN, NaN], index=['__line__', 'title', 'authorid(name)'])
+    row = pd.Series([0, nan, nan], index=['__line__', 'title', 'authorid(name)'])
 
     with pytest.raises(AssertionError):
         InsertSqlCreator()._create_sql_row(mapping, row)

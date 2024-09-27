@@ -1,5 +1,4 @@
 import pandas as pd
-from numpy import NaN
 
 from stimula.header.csv_header_parser import HeaderParser
 from stimula.service.diff_to_sql import DiffToSql

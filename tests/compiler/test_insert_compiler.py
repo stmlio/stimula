@@ -76,7 +76,7 @@ def test_extension(books, meta, context, ir_model_data):
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
     mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     result = InsertCompiler().compile(mapping)
-    expected = "insert into books(title) select :title returning id"
+    expected = "insert into books(title) select :title returning books.id"
     assert result == expected
 
 

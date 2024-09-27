@@ -19,7 +19,7 @@ def test_insert_extension(db, books, ir_model_data):
 
     dtypes = {'sql': 'string', 'title': 'string', 'name': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
     expected = pd.DataFrame([
-        ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
+        ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning books.bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
         ['insert into ir_model_data (name, module, model, res_id) values (:name_1, :module, :model, :res_id)', None, None, '12345', 'netsuite_books', 'books', None]
     ],
         columns=['sql', 'title', 'name', 'name_1', 'module', 'model', 'res_id']
@@ -40,7 +40,7 @@ def test_insert_execute_extension(db, books, ir_model_data, context):
 
     dtypes = {'rows': 'Int64', 'sql': 'string', 'title': 'string', 'name': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
     expected = pd.DataFrame([
-        [1, 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
+        [1, 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning books.bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
         [1, 'insert into ir_model_data (name, module, model, res_id) values (:name_1, :module, :model, :res_id)', None, None, '12345', 'netsuite_books', 'books', 7]
     ],
         columns=['rows', 'sql', 'title', 'name', 'name_1', 'module', 'model', 'res_id']
@@ -61,7 +61,7 @@ def test_insert_unique_extension(db, books, ir_model_data, context):
 
     dtypes = {'rows': 'Int64', 'sql': 'string', 'title': 'string', 'name': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
     expected = pd.DataFrame([
-        [1, 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
+        [1, 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning books.bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
         [1, 'insert into ir_model_data (name, module, model, res_id) values (:name_1, :module, :model, :res_id)', None, None, '12345', 'netsuite_books', 'books', 7]
     ],
         columns=['rows', 'sql', 'title', 'name', 'name_1', 'module', 'model', 'res_id']
@@ -81,7 +81,7 @@ def test_insert_extension_defaults(db, books, ir_model_data):
 
     dtypes = {'sql': 'string', 'title': 'string', 'name': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
     expected = pd.DataFrame([
-        ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
+        ['insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name returning books.bookid', 'Pride and Prejudice', 'Jane Austen', '12345', None, None, None],
         ['insert into ir_model_data (name, module, model, res_id) values (:name_1, :module, :model, :res_id)', None, None, '12345', 'netsuite_books', 'books', None]
     ],
         columns=['sql', 'title', 'name', 'name_1', 'module', 'model', 'res_id']
@@ -126,7 +126,7 @@ def test_delete_execute_extension(db, books, ir_model_data, context):
 
     dtypes = {'rows': 'Int64', 'sql': 'string', 'title': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
     expected = pd.DataFrame([
-        [1, 'delete from books where books.title = :title returning bookid', 'Emma', '11111', None, None, None],
+        [1, 'delete from books where books.title = :title returning books.bookid', 'Emma', '11111', None, None, None],
         [1, 'delete from ir_model_data where name = :name_1 and module = :module and model = :model and res_id = :res_id', None, '11111', 'netsuite_books', 'books', 1]
     ],
         columns=['rows', 'sql', 'title', 'name_1', 'module', 'model', 'res_id']
@@ -152,7 +152,7 @@ def test_delete_unique_execute_extension(db, books, ir_model_data, context):
     dtypes = {'rows': 'Int64', 'sql': 'string', 'name_1': 'string', 'module': 'string', 'model': 'string', 'res_id': 'Int64'}
     expected = pd.DataFrame([
         [1,
-         'delete from books using ir_model_data where books.bookid = ir_model_data.res_id and ir_model_data.name = :name_1 and ir_model_data.module = \'netsuite_books\' and ir_model_data.model = \'books\' returning bookid',
+         'delete from books using ir_model_data where books.bookid = ir_model_data.res_id and ir_model_data.name = :name_1 and ir_model_data.module = \'netsuite_books\' and ir_model_data.model = \'books\' returning books.bookid',
          '11111', None, None, None],
         [1, 'delete from ir_model_data where name = :name_1 and module = :module and model = :model and res_id = :res_id', '11111', 'netsuite_books', 'books', 1]
     ],

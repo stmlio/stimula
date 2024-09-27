@@ -28,7 +28,7 @@ def test_insert_sql_creator_external_id(books, meta):
     inserts = InsertSqlCreator().create_sql(mapping, diff)
     actual = list(inserts)[0].queries()
 
-    expected = [('insert into books(title) select :title returning id', {'name': '12345', 'title': 'Pride and Prejudice'}),
+    expected = [('insert into books(title) select :title returning books.id', {'name': '12345', 'title': 'Pride and Prejudice'}),
                 ('insert into ir_model_data (name, module, model, res_id) values (:name, :module, :model, :res_id)',
                  {'model': 'books', 'module': 'netsuite_books', 'name': '12345', 'res_id': None})]
 
@@ -51,7 +51,7 @@ def test_insert_sql_creator_external_id_unique(books, meta, ir_model_data):
     inserts = InsertSqlCreator().create_sql(mapping, diff)
     actual = list(inserts)[0].queries()
 
-    expected = [('insert into books(title) select :title returning id', {'name': '11112', 'title': 'Emma'}),
+    expected = [('insert into books(title) select :title returning books.id', {'name': '11112', 'title': 'Emma'}),
                 ('insert into ir_model_data (name, module, model, res_id) values (:name, :module, :model, :res_id)',
                  {'model': 'books', 'module': 'netsuite_books', 'name': '11112', 'res_id': None})]
 
@@ -111,7 +111,7 @@ def test_delete_sql_creator_external_id(books, meta):
     deletes = DeleteSqlCreator().create_sql(mapping, diff)
     actual = list(deletes)[0].queries()
 
-    expected = [('delete from books where books.title = :title returning id', {'name': '12345', 'title': 'Pride and Prejudice'}),
+    expected = [('delete from books where books.title = :title returning books.id', {'name': '12345', 'title': 'Pride and Prejudice'}),
                 ('delete from ir_model_data where name = :name and module = :module and model = :model and res_id = :res_id',
                  {'model': 'books', 'module': 'netsuite_books', 'name': '12345', 'res_id': None})]
 

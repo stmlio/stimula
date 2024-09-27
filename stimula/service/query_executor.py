@@ -70,7 +70,7 @@ class SimpleQueryExecutor(QueryExecutor):
             error = 'No row was affected'
             return ExecutionResult(self.line_number, self.operation_type, False, rowcount, self.table_name, self.query, self.params, self.context, error=error)
 
-        # verify no more than one row was inserted
+        # verify no more than one row was affected
         if rowcount > 1:
             # we must not commit the transaction
             error = "More than one row was affected, do not commit."
@@ -115,7 +115,7 @@ class DependentQueryExecutor(QueryExecutor):
             # skip execution of dependent query
             return execution_result
 
-        # verify no more than one row was inserted
+        # verify no more than one row was affected
         if rowcount_0 > 1:
             # raise exception, bec/ we must not commit the transaction
             raise ValueError("More than one row was affected. Inserts: %s, Query: %s, Params: %s" % (rowcount_0, query_0, params_0))
@@ -158,7 +158,8 @@ class OperationType(Enum):
 
 class ExecutionResult:
     def __init__(self, line_number, operation_type, success, rowcount, table_name, query, params, context, error=None, block_commit=False):
-        self.line_number = line_number
+        # convert numpy int64 to int
+        self.line_number = int(line_number) if line_number is not None else None
         if not isinstance(operation_type, OperationType):
             raise ValueError(f"operation_type must be an instance of OperationType Enum, not {type(operation_type)}")
         self.operation_type = operation_type
