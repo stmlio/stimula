@@ -92,10 +92,10 @@ class FailedQueryExecutor(QueryExecutor):
         return []
 
     def execute(self, cursor):
-        return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, None, None, self.context, error=self.error)
+        return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, None, {}, self.context, error=self.error)
 
     def fake_execute(self):
-        return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, None, None, self.context, error=self.error)
+        return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, None, {}, self.context, error=self.error)
 
 '''
 This class allows for dependent queries, where the result of the first query is used as a parameter in the second query.

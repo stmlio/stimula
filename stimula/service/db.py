@@ -26,6 +26,7 @@ from stimula.header.odoo_header_parser import OdooHeaderParser
 from .context import cnx_context, get_metadata
 from .diff_to_sql import DiffToSql
 from .query_executor import OperationType
+from .reporter import Reporter
 from ..compiler.alias_compiler import AliasCompiler
 
 _logger = logging.getLogger(__name__)
@@ -175,7 +176,7 @@ class DB:
         execution_results = self._execute_sql(query_executors, execute, commit)
 
         # create full report
-        return self._create_post_report(execution_results, execute, commit)
+        return Reporter().create_post_report(execution_results, execute, commit)
 
     def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
                                              post_script=None, context=None):
@@ -203,36 +204,8 @@ class DB:
         execution_results = self._execute_sql(query_executors, execute, commit)
 
         # create full report
-        return self._create_post_report(execution_results, execute, commit)
+        return Reporter().create_post_report( execution_results, execute, commit)
 
-    def _create_post_report(self, execution_results, execute, commit):
-        insert = len([er for er in execution_results if er.operation_type == OperationType.INSERT])
-        update = len([er for er in execution_results if er.operation_type == OperationType.UPDATE])
-        delete = len([er for er in execution_results if er.operation_type == OperationType.DELETE])
-
-        found = {'insert': insert, 'update': update, 'delete': delete}
-
-        summary = {'found': found, 'execute': execute, 'commit': commit}
-
-        result = {'summary': summary}
-
-        # only set success & failed if execute is True
-        if execute:
-            # summarize successful operations
-            summary['success'] = {'insert': len([er for er in execution_results if er.operation_type == OperationType.INSERT and er.success]),
-                       'update': len([er for er in execution_results if er.operation_type == OperationType.UPDATE and er.success]),
-                       'delete': len([er for er in execution_results if er.operation_type == OperationType.DELETE and er.success])}
-
-            # summarize failed operations
-            summary['failed'] = {'insert': len([er for er in execution_results if er.operation_type == OperationType.INSERT and not er.success]),
-                      'update': len([er for er in execution_results if er.operation_type == OperationType.UPDATE and not er.success]),
-                      'delete': len([er for er in execution_results if er.operation_type == OperationType.DELETE and not er.success])}
-
-        # list execution results
-        rows = list(chain(*[er.report(execute) for er in execution_results]))
-        result['rows'] = rows
-
-        return result
 
     def _convert_to_df(self, sqls, showResult):
         # create empty pandas dataframe. First column contains sql
