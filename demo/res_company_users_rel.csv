@@ -1,0 +1,2 @@
+cid(name)[unique=true],user_id(login)[unique=true]
+Beautiful Things,admin
