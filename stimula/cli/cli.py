@@ -42,6 +42,7 @@ Options:
 
 import argparse
 import getpass
+import json
 import os
 import sys
 from importlib.metadata import version
@@ -79,7 +80,7 @@ class StimulaCLI:
     def parse_args(self):
         parser = argparse.ArgumentParser(description='stimula - The STML CLI')
         parser.add_argument('command', help='Command to execute', choices=['auth', 'list', 'mapping', 'count', 'get', 'post', 'transpose', 'google', 'anonymize'])
-        parser.add_argument('-r', '--remote', help='Remote API URL',  nargs='?', const=os.getenv('STIMULA_REMOTE'))
+        parser.add_argument('-r', '--remote', help='Remote API URL')
         parser.add_argument('-H', '--host', help='Database host', default='localhost')
         parser.add_argument('-P', '--port', help='Database port', type=int, default=5432)
         parser.add_argument('-d', '--database', help='Database name')
@@ -120,6 +121,10 @@ class StimulaCLI:
             assert args.google_auth, 'No Google credentials file provided. Use --google-auth or -G to provide Google credentials json file.'
             google_authenticate(args.google_auth)
 
+        # if this is not auth, and no token provided, then try to read from local file
+        if args.command != 'auth' and not args.token:
+            self._read_token_from_file(args)
+
         if args.remote:
             # if remote is specified, use remote invoker
             invoker = remote.Invoker(args.remote)
@@ -134,8 +139,6 @@ class StimulaCLI:
             # use local invoker
             invoker = local.Invoker(args.key, args.host, args.port)
 
-        # try to read token from local file
-        self._read_token_from_file(args)
 
         # if auth request or no token provided
         if args.command == 'auth' or not args.token:
@@ -243,15 +246,8 @@ class StimulaCLI:
         args.token = invoker.auth(args.database, args.user, args.password)
 
         # write token to local file
-        self._write_token_to_file(args.token)
+        self._write_token_to_file(args.token, args.remote)
 
-        # set SECRET_KEY in environment if provided
-        if args.key:
-            os.environ['STIMULA_KEY'] = args.key
-
-        # set REMOTE in environment if provided
-        if args.remote:
-            os.environ['STIMULA_REMOTE'] = args.remote
 
 
     def _transpose_stdin_stdout(self):
@@ -269,18 +265,25 @@ class StimulaCLI:
         Anonymizer().anonymize(sys.stdin, sys.stdout)
 
     def _read_token_from_file(self, args):
-        # try to read token from local file if not provided in arguments
-        if not args.token:
+        # check if .stimula_token file exists
+        if os.path.exists('.stimula_token'):
             try:
+                # read json from .stimula_token file
                 with open('.stimula_token', 'r') as file:
-                    args.token = file.read()
-            except FileNotFoundError:
+                    data = json.load(file)
+                    args.token = data.get('token')
+                    args.remote = data.get('remote')
+            except json:
+                print('Error reading token from file. Please re-authenticate.')
                 pass
 
-    def _write_token_to_file(self, token):
+    def _write_token_to_file(self, token, remote):
+        data = {'token': token}
+        if remote:
+            data['remote'] = remote
         # write token to local file
         with open('.stimula_token', 'w') as file:
-            file.write(token)
+            json.dump(data, file, indent=4)
 
     def _read_mapping_from_file(self, args):
         # check if args.mapping is an existing file name
