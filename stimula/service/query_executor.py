@@ -82,6 +82,21 @@ class SimpleQueryExecutor(QueryExecutor):
     def fake_execute(self):
         return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self.query, self.params, self.context)
 
+# This class is used to store input rows that failed to compile into a query
+class FailedQueryExecutor(QueryExecutor):
+    def __init__(self, line_number, operation_type, table_name, context, error):
+        super().__init__(line_number, operation_type, table_name, context)
+        self.error = error
+
+    def queries(self):
+        return []
+
+    def execute(self, cursor):
+        return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, None, None, self.context, error=self.error)
+
+    def fake_execute(self):
+        return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, None, None, self.context, error=self.error)
+
 '''
 This class allows for dependent queries, where the result of the first query is used as a parameter in the second query.
 This is useful for extensions, such as the ir_model_data table in Odoo.

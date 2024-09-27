@@ -348,7 +348,7 @@ class StimulaCLI:
             # delete statements don't have a line number
             if row.get("line_number"):
                 result += f' Line: {row["line_number"]}'
-            result += f' Success: {row.get("success", False)} Error: {row.get("error", "N/A")} Query: "{row["query"]}"'
+            result += f' Success: {row.get("success", False)} Error: {row.get("error", "N/A")} Query: "{row.get("query", "N/A")}"'
 
         return result
 

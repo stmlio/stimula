@@ -23,7 +23,7 @@ import numpy
 import pandas as pd
 from psycopg2._json import Json
 
-from .query_executor import SimpleQueryExecutor, DependentQueryExecutor, OperationType
+from .query_executor import SimpleQueryExecutor, DependentQueryExecutor, OperationType, FailedQueryExecutor
 from ..compiler.delete_compiler import DeleteCompiler
 from ..compiler.header_compiler import HeaderCompiler
 from ..compiler.insert_compiler import InsertCompiler, ReturningClauseCompiler
@@ -37,6 +37,7 @@ class SqlCreator:
     def __init__(self):
         self._values_lexer = ValuesLexer()
         self._values_parser = ValuesParser()
+        self.operation_type = None
 
     def create_sql(self, mapping, diffs, context=None):
 
@@ -50,12 +51,13 @@ class SqlCreator:
             try:
                 # create query for row
                 operation_type, query, value_dict = self._create_sql_row(mapping, row)
-            except Exception as e:
-                # raise exception with line number
-                raise Exception(f'Error in line {line_number+2}, {[", ".join([str(c) for c in row])]}: {str(e)}')
 
-            # yield query and split columns
-            yield SimpleQueryExecutor(line_number, operation_type, mapping['table'], query, value_dict, context)
+                # yield query and split columns
+                yield SimpleQueryExecutor(line_number, operation_type, mapping['table'], query, value_dict, context)
+            except Exception as e:
+                # yield query with line number and error message
+                yield FailedQueryExecutor(line_number, self.operation_type, mapping['table'], context, str(e))
+
 
     def _create_sql_row(self, mapping, row):
         # Create a dictionary with unique column headers as keys and values as values. We'll need these for all query types.
@@ -211,6 +213,9 @@ class SqlCreator:
 
 
 class InsertSqlCreator(SqlCreator):
+    def __init__(self):
+        super().__init__()
+        self.operation_type = OperationType.INSERT
 
     def create_sql(self, mapping, diffs, context=None):
         # override to create dependent insert queries for extensions
@@ -242,7 +247,7 @@ class InsertSqlCreator(SqlCreator):
 
     def _create_query(self, mapping, value_dict):
         # create insert query
-        return OperationType.INSERT, InsertCompiler().compile(mapping)
+        return self.operation_type, InsertCompiler().compile(mapping)
 
     def _create_extension_insert_query(self, mapping, param):
         # get table, name parameter name and values
@@ -258,6 +263,10 @@ class InsertSqlCreator(SqlCreator):
 
 
 class UpdateSqlCreator(SqlCreator):
+
+    def __init__(self):
+        super().__init__()
+        self.operation_type = OperationType.UPDATE
 
     def _create_unique_value_dict(self, mapping, row):
         # split row in self and other
@@ -336,7 +345,7 @@ class UpdateSqlCreator(SqlCreator):
 
     def _create_query(self, tree, value_dict):
         # create query
-        return OperationType.UPDATE, UpdateCompiler().compile(tree)
+        return self.operation_type, UpdateCompiler().compile(tree)
 
     def _get_line_number(self, row):
         # for updates, the column contains Series, not sure how to change that
@@ -344,6 +353,11 @@ class UpdateSqlCreator(SqlCreator):
 
 
 class DeleteSqlCreator(SqlCreator):
+    def __init__(self):
+        super().__init__()
+        self.operation_type = OperationType.DELETE
+
+
     def create_sql(self, mapping, diffs, context=None):
         # override to create dependent delete queries for extensions
         for query_executor in super().create_sql(mapping, diffs, context):
@@ -366,7 +380,7 @@ class DeleteSqlCreator(SqlCreator):
 
     def _create_query(self, mapping, value_dict):
         # create query
-        return OperationType.DELETE, DeleteCompiler().compile(mapping)
+        return self.operation_type, DeleteCompiler().compile(mapping)
 
     def _get_line_number(self, row):
         # deletes don't have a matching input row
