@@ -70,8 +70,10 @@ class StimulaCLI:
                 # print message with stack trace
                 raise e
             else:
-                # print message without stack trace to stderr
-                print(f'Error: {e}', file=sys.stderr)
+                # print first line, to avoid the remote stacktrace
+                first_line = str(e).split('\n')[0]
+                print(f'Error: {first_line}')
+
             return 1
 
     def parse_args(self):
@@ -195,16 +197,19 @@ class StimulaCLI:
                 # leave it to the server to use first line of contents as mapping
 
             # if verbose, print mapping
-            if args.verbose:
+            if args.verbose and args.mapping:
                 print(f'Mapping: {args.mapping}')
+
+            # lower case the enable flags
+            args.enable = args.enable.lower()
 
             result = invoker.post_table(tables, args.mapping, args.query, files,
                                         skiprows=args.skip,
-                                        insert='I' in args.enable,
-                                        update='U' in args.enable,
-                                        delete='D' in args.enable,
-                                        execute='E' in args.enable,
-                                        commit='C' in args.enable,
+                                        insert='i' in args.enable,
+                                        update='u' in args.enable,
+                                        delete='d' in args.enable,
+                                        execute='e' in args.enable,
+                                        commit='c' in args.enable,
                                         format=args.format,
                                         post_script=args.execute,
                                         context=context)
@@ -215,7 +220,8 @@ class StimulaCLI:
     def _authenticate(self, args, invoker):
         # assert that database and username are provided if we don't have a token
         if not args.token:
-            assert args.database and args.user, 'Database and username must be provided for authentication.'
+            # database is not required for single db Odoo instance
+            assert args.user, 'Username must be provided for authentication.'
 
         # if we have a token, then use it for default database and username
         if args.token:
@@ -228,7 +234,10 @@ class StimulaCLI:
         # ask for password if not provided
         if not args.password:
             # hide password input
-            args.password = getpass.getpass(f'Enter password for {args.user}@{args.database}: ')
+            if args.database:
+                args.password = getpass.getpass(f'Enter password for {args.user}@{args.database}: ')
+            else:
+                args.password = getpass.getpass(f'Enter password for {args.user}: ')
 
         # authenticate and set token
         args.token = invoker.auth(args.database, args.user, args.password)
@@ -343,8 +352,9 @@ class StimulaCLI:
 
 def validate_flags(value):
     # validation function for enable flags
-    valid_letters = set("IUDEC")
-    input_set = set(value)
+    valid_letters = set("iudec")
+    # create a set from the input string, lowercase
+    input_set = set(value.lower())
 
     if not input_set.issubset(valid_letters):
         raise argparse.ArgumentTypeError(f"Invalid combination: {value}. Only the letters I, U, D, E, and C are allowed.")
