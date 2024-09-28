@@ -317,10 +317,11 @@ class StimulaCLI:
         # report summary
         report = ''
 
-        rows = summary.get("rows", 0)
-        report += f'Rows read:  {rows}\n'
-        if rows == 0:
-            return report
+        if 'rows' in summary:
+            rows = summary.get("rows")
+            report += f'Rows read:  {rows}\n'
+            if rows == 0:
+                return report
 
         operations = total.get("operations", 0)
         report += f'Operations: {operations}\n'

@@ -21,11 +21,11 @@ class Reporter:
         if cnx_context and hasattr(cnx_context, 'username'):
             summary['username'] = cnx_context.username
 
-        # count number of rows in all contents, they are binary strings. Make sure to convert to string before counting
         try:
-            row_count = sum([len(content.decode('utf-8').strip().split('\n')) - skiprows for content in contents])
-            summary['rows'] = row_count
+            # count number of rows in all contents.
+            summary['rows'] = sum([self._count_rows(content, skiprows) for content in contents])
         except:
+            # if counting fails, do nothing
             pass
 
         summary['total'] = {
@@ -77,3 +77,9 @@ class Reporter:
 
         # Return the hexadecimal representation of the hash
         return md5_hash.hexdigest()
+
+    def _count_rows(self, content, skiprows):
+        # decode the input string, or leave if it's already a string
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+        return len(content.strip().split('\n')) - skiprows
