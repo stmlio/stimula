@@ -594,10 +594,14 @@ class DB:
         if commit:
             cnx_context.cnx.commit()
 
-            # registry may not be availabe during unit tests
+            # registry may not be available during unit tests
             if hasattr(cnx_context, 'registry'):
-                # invalidate caches to avoid stale values coming from cache
-                cnx_context.registry.clear_cache()
+                # registry may not have clear_cache() method
+                if hasattr(cnx_context.registry, 'clear_cache'):
+                    # invalidate caches to avoid stale values coming from cache
+                    cnx_context.registry.clear_cache()
+                else:
+                    _logger.warning("Registry has no clear_cache() method")
 
         return result
 
