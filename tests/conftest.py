@@ -22,7 +22,8 @@ class TestAuth(Auth):
         pass
 
     def _validate_token_credentials(self, database, username, password):
-        pass
+        # return cnx, cr for caller to unpack
+        return None, None
 
 
 @pytest.fixture

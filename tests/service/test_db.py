@@ -428,12 +428,17 @@ def test_post_table_get_full_report(db, books, context):
     full_report['rows'] = sorted(full_report['rows'], key=lambda x: x.get('line_number', 0))
 
     expected = {
-        'summary': {
-            'execute': True, 'commit': False,
-            'found': {'insert': 2, 'update': 3, 'delete': 1},
-            'success': {'insert': 2, 'update': 2, 'delete': 1},
-            'failed': {'insert': 0, 'update': 1, 'delete': 0}
-        }, 'rows': [
+        'summary': {'commit': False,
+                    'execute': True,
+                    'failed': {'delete': 0, 'insert': 0, 'update': 1},
+                    'rows': 7,
+                    'success': {'delete': 1, 'insert': 2, 'update': 2},
+                    'total': {'delete': 1, 'failed': 1, 'insert': 2, 'operations': 6, 'success': 5, 'update': 3}
+        }, 'files': [{'context': 'my table',
+            'md5': '4d243d3873027da1af176f6e9e078f91',
+            'size': 259,
+            'table': 'books'}
+        ], 'rows': [
             {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table_name': 'books', 'context': 'my table',
              'query': 'delete from books where books.title = :title',
              'params': {'title': 'Catch-22'}},
@@ -455,6 +460,9 @@ def test_post_table_get_full_report(db, books, context):
              'params': {'title': 'A Christmas Carol', 'name': 'Charles Dickens'}},
         ]}
 
+    # remove /summary/timestamp, because it is a timestamp
+    full_report['summary'].pop('timestamp')
+
     assert full_report == expected
 
 
@@ -471,8 +479,14 @@ def test_post_table_get_full_report_no_execute(db, books, context):
     full_report = db.post_table_get_full_report('books', 'title[unique=true], authorid(name)', None, body, insert=True, update=True, delete=True, context='my table')
     expected_summary = {
         'execute': False, 'commit': False,
-        'found': {'insert': 2, 'update': 3, 'delete': 1},
+        'failed': {'delete': 1, 'insert': 2, 'update': 3},
+        'rows': 7,
+        'success': {'delete': 0, 'insert': 0, 'update': 0},
+        'total': {'delete': 1, 'failed': 6, 'insert': 2, 'operations': 6, 'success': 0, 'update': 3}
     }
+
+    # remove /summary/timestamp, because it is a timestamp
+    full_report['summary'].pop('timestamp')
 
     assert full_report['summary'] == expected_summary
 

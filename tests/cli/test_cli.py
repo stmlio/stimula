@@ -8,7 +8,7 @@ Operations: 20
 Success:    19
 Failed:     1
 Customers:6 - "Parsing error at token Token(type=':', value=':', lineno=1, index=0, end=1)" 
-Transaction not committed
+Specify --commit (-C) to commit transaction.
 '''
     assert report == expected
 
