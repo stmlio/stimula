@@ -93,7 +93,6 @@ class StimulaCLI:
         parser.add_argument('-m', '--mapping', help='Mapping header')
         parser.add_argument('-f', '--files', nargs='+', help='One or more paths to the files to post')
         parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
-        parser.add_argument('-e', '--enable', help='Enable flags', type=validate_flags)
         parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
         parser.add_argument('-v', '--version', action='version', version=version('stimula'))
         parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
@@ -103,6 +102,10 @@ class StimulaCLI:
         parser.add_argument('-G', '--google_auth', nargs='?', help='Optional path of Google credentials file', const='client_secret.json')
         parser.add_argument('-g', '--google_sheet', nargs='?', help='ID of Google Sheets document')
         parser.add_argument('-a', '--audit', action='store_true', help='Print audit trail')
+        parser.add_argument('-I', '--insert', action='store_true', help='Enable INSERT operations')
+        parser.add_argument('-U', '--update', action='store_true', help='Enable UPDATE operations')
+        parser.add_argument('-D', '--delete', action='store_true', help='Enable DELETE operations')
+        parser.add_argument('-C', '--commit', action='store_true', help='Commit transaction')
         args = parser.parse_args()
         return args
 
@@ -162,13 +165,17 @@ class StimulaCLI:
 
         # execute command
         if args.command == 'auth':
-            print(f'Connected as {args.user}.')
+            if args.remote:
+                print(f'Connected to {args.remote} as {args.user}.')
+            else:
+                print(f'Connected as {args.user}.')
         elif args.command == 'list':
             filter = args.tables[0] if args.tables else None
             tables = invoker.list(filter)
             # print name and count of tables
             for table in tables:
-                print(f'{table["name"]}: {table["count"]}')
+                if args.verbose or table["count"] > 0:
+                    print(f'{table["name"]}: {table["count"]}')
         elif args.command == 'mapping':
             assert args.tables and len(args.tables) == 1, 'One table name must be provided using -t or --table flag.'
             mapping = invoker.mapping(args.tables[0])
@@ -184,7 +191,7 @@ class StimulaCLI:
         elif args.command == 'post':
 
             # we need at least one of the flags I, U, D,  enabled
-            assert args.enable, 'At least one of the flags I, U, D must be enabled. Otherwise, there\'s nothing to do.'
+            assert args.insert or args.update or args.delete, 'At least one of the flags I, U, D must be enabled. Otherwise, there\'s nothing to do.'
 
             # read data from Google Sheets or from file
             if args.google_sheet:
@@ -204,16 +211,13 @@ class StimulaCLI:
             if args.verbose and args.mapping:
                 print(f'Mapping: {args.mapping}')
 
-            # lower case the enable flags
-            args.enable = args.enable.lower()
-
             result = invoker.post_table(tables, args.mapping, args.query, files,
                                         skiprows=args.skip,
-                                        insert='i' in args.enable,
-                                        update='u' in args.enable,
-                                        delete='d' in args.enable,
-                                        execute='e' in args.enable,
-                                        commit='c' in args.enable,
+                                        insert=args.insert,
+                                        update=args.update,
+                                        delete=args.delete,
+                                        execute=True,
+                                        commit=args.commit,
                                         format=args.format,
                                         post_script=args.execute,
                                         context=context)
@@ -343,7 +347,7 @@ class StimulaCLI:
         if summary.get('commit', False):
             report += 'Transaction committed\n'
         else:
-            report += 'Transaction not committed\n'
+            report += 'Specify --commit (-C) to commit transaction.\n'
 
 
         return report
