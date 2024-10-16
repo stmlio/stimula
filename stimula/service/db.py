@@ -457,12 +457,16 @@ class DB:
                     # apply this converter to value column
                     df[column] = df[column].apply(converters[column])
                 elif column in df.index.names:
+                    if isinstance(df.index, pd.MultiIndex):
 
-                    # get the index column
-                    index_column = df.index.levels[df.index.names.index(column)]
+                        # get the index column for a MultiIndex
+                        index_column = df.index.levels[df.index.names.index(column)]
 
-                    # apply this converter to the index column
-                    df.index = df.index.set_levels(index_column.map(converters[column]), level=column)
+                        # apply this converter to the index column for a MultiIndex
+                        df.index = df.index.set_levels(index_column.map(converters[column]), level=column)
+                    else:
+                        # if it's not a MultiIndex, just apply the converter to the single-level index
+                        df.index = df.index.map(converters[column])
 
     def _compare(self, df_request, df_db, insert, update, delete):
         # remove columns with empty names. Don't do this when reading from DB, because in get_table request we also want empty columns

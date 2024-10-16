@@ -232,3 +232,30 @@ def _test_post_json_object_as_unique_key(db, meta, lexer):
     ).astype(dtypes)
 
     assert result.equals(expected)
+
+
+def test_post_json_from_string(db, meta, lexer, context):
+    # test that DB can convert a string into a json object, based on the 'key' modifier
+    header = 'name[unique=true], jsonb[key=en_US]'
+
+    body = f'''
+        key 2, A string to convert to JSON
+    '''
+
+    # post jsonb
+    result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
+
+    assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
+
+def test_post_json_from_string_unique(db, meta, lexer, context):
+    # test that DB can convert a string into a json object, based on the 'key' modifier, even when it's a unique column
+    header = 'name, jsonb[key=en_US: unique=true]'
+
+    body = f'''
+        key 2, A string to convert to JSON
+    '''
+
+    # post jsonb
+    result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
+
+    assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}

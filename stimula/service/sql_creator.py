@@ -205,6 +205,11 @@ class SqlCreator:
             # use psycopg's Json to correctly convert unicode characters
             value = Json(value)
 
+        # dict is stored in data frame as frozenset, bec/ the index requires hashable objects
+        if isinstance(value, frozenset):
+            # convert to dict, then use psycopg's Json to correctly convert unicode characters
+            value = Json(dict(value))
+
         return value
 
     def _create_query(self, tree, value_dict):

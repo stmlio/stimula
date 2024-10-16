@@ -90,9 +90,10 @@ class TypesCompiler:
         if 'default-value' in column:
             result['read_csv_converter'] = default_value_converter(dtype, column['default-value'])
 
-        # set converter if column has a key, use it to create a dict
+        # set converter if column has a key, use it to create a dict, but store in data frame as hashable frozenset
         if 'key' in column:
-            result['read_csv_converter'] = dictionary_converter(dtype, column['key'])
+            result['read_csv_converter'] = _key_to_frozenset_converter(dtype, column['key'])
+            result['read_db_converter'] = _dict_to_frozenset_converter(dtype)
 
         # if type is text and there's no read_csv_converter yet, the default is to strip trailing spaces
         if dtype == 'string' and 'read_csv_converter' not in result:
@@ -269,9 +270,14 @@ def _set_default_value(value, default):
     return value if value is not None and value != '' and not (isinstance(value, (float, np.float64)) and np.isnan(value)) else default
 
 
-def dictionary_converter(dtype, key):
-    # pandas ignores dtype if a converter is set, so we need to convert the value to the correct type
-    return lambda value: _convert_to_dtype(dtype, {key: value})
+def _key_to_frozenset_converter(dtype, key):
+    # a dict is not hashable and can't be used as index field, so return frozen set instead of dict when reading from CSV
+    return lambda value: frozenset({(key, value)})
+
+
+def _dict_to_frozenset_converter(dtype):
+    # a dict is not hashable and can't be used as index field, so return frozen set instead of dict when reading from DB
+    return lambda value: frozenset(value.items())
 
 
 def _convert_to_dtype(dtype, value):
