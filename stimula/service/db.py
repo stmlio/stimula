@@ -120,13 +120,13 @@ class DB:
 
         return df, mapping
 
-    def get_table_as_csv(self, table_name, header, where_clause, escapechar=''):
+    def get_table_as_csv(self, table_name, header, where_clause, escapechar=None):
         # get table as dataframe
         df, mapping = self.get_table(table_name, header, where_clause)
 
         return self.convert_to_csv(df, mapping, escapechar)
 
-    def convert_to_csv(self, df, mapping, escapechar=''):
+    def convert_to_csv(self, df, mapping, escapechar=None):
         # need converters from types compiler
         column_names = HeaderCompiler().compile_list(mapping)
         column_types = TypesCompiler().compile(mapping, column_names)
