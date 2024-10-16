@@ -54,6 +54,7 @@ from stimula.cli import local, remote
 from stimula.cli.anonymizer import Anonymizer
 from stimula.cli.file_source import FileSource
 from stimula.cli.google_source import GoogleSource, google_authenticate
+from stimula.service.query_executor import OperationType
 
 
 class StimulaCLI:
@@ -382,8 +383,17 @@ class StimulaCLI:
 
     def _report_audit(self, result):
         # return result with indented json layout
-        return json.dumps(result, indent=4)
+        return json.dumps(result, default=self._custom_encoder, indent=2)
 
+    def _custom_encoder(self, obj):
+        if isinstance(obj, OperationType):
+            # Convert OperationType Enum to string
+            return repr(obj)
+        elif isinstance(obj, pd.Timestamp):
+            # Convert Timestamps to ISO format
+            return obj.isoformat()
+        # Fall back to default behavior for unknown types
+        return json.JSONEncoder().default(obj)
 
     def _report_row(self, row, verbose):
         if not verbose:
