@@ -144,7 +144,6 @@ class StimulaCLI:
             # use local invoker
             invoker = local.Invoker(args.key, args.host, args.port)
 
-
         # if auth request or no token provided
         if args.command == 'auth' or not args.token:
             # authenticate and set token
@@ -225,7 +224,6 @@ class StimulaCLI:
 
             print(self._create_report(result, args.audit, args.verbose))
 
-
     def _authenticate(self, args, invoker):
         # assert that database and username are provided if we don't have a token
         if not args.token:
@@ -253,8 +251,6 @@ class StimulaCLI:
 
         # write token to local file
         self._write_token_to_file(args.token, args.remote)
-
-
 
     def _transpose_stdin_stdout(self):
         # validate we have stdin
@@ -350,7 +346,6 @@ class StimulaCLI:
         else:
             report += 'Specify --commit (-C) to commit transaction.\n'
 
-
         return report
 
     def _report_verbose(self, result):
@@ -423,8 +418,10 @@ def validate_flags(value):
 
     return value
 
+
 def main():
     return StimulaCLI().main()
+
 
 if __name__ == '__main__':
     main()
