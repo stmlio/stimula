@@ -435,16 +435,16 @@ class DB:
         # set headers, they must equal the request headers for comparison
         df.columns = column_names
 
-        # set index columns, if header contains unique columns
-        if set_index and index_columns:
-            df.set_index(index_columns, inplace=True)
-
         # apply converters after reading from DB, because read_sql_query() doesn't support converters
         converters = column_types['read_db_converters']
         self._apply_converters(column_names, converters, df)
 
         # force pandas to not convert int columns to float if they contain NaNs
         df = df.convert_dtypes()
+
+        # set index columns, if header contains unique columns. Set index after converting, because we need to convert dict to frozenset so it is hashable.
+        if set_index and index_columns:
+            df.set_index(index_columns, inplace=True)
 
         return df
 
