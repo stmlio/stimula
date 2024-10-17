@@ -182,7 +182,7 @@ class DB:
                                              post_script=None, context=None):
         assert len(table_names) == len(contents), f"Provide exactly one file for each table name, so {len(table_names)}, not {len(contents)}"
         assert header is None, "Header must be None when posting multiple tables"
-        assert skiprows ==1, "Skiprows must be 1 when posting multiple tables"
+        assert skiprows == 1, "Skiprows must be 1 when posting multiple tables"
         assert post_script is None, "Post script must be None when posting multiple tables"
         assert context is not None and len(context) == len(table_names), "Provide exactly one context for each table name, not %s" % len(context or [])
 
@@ -205,7 +205,6 @@ class DB:
 
         # create full report
         return Reporter().create_post_report(table_names, contents, context, execution_results, execute, commit, skiprows)
-
 
     def _convert_to_df(self, sqls, showResult):
         # create empty pandas dataframe. First column contains sql
@@ -348,17 +347,13 @@ class DB:
             keep_default_na=False
         )
 
-        # iterate columns types and convert to the correct type.
-        # Need to do this after reading, because pd sets converter results to type object
-        for column, type in dtype.items():
-            # skip setting index types
-            if column in df.columns:
-                # convert column to the correct type
-                df[column] = df[column].astype(type)
+        # Restore index and column types, because pd set converter results to type object.
+        self._restore_column_types(df, dtype)
 
+        # pad dataframe with empty columns if we have more column names in use_columns than exist in the dataframe
         df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, index_columns, converters)
 
-        # evaluate column expressions
+        # evaluate column expressions, must do after restoring index and column types
         self._evaluate_expressions(df_padded, mapping, index_columns)
 
         # insert a column with line numbers
@@ -377,13 +372,28 @@ class DB:
 
             raise ValueError(f"Duplicates found: {duplicate_map}")
 
-
         # apply post script if provided
         if post_script:
             # execute post script
             self._execute_post_script(df_padded, post_script)
 
         return df_padded
+
+    def _restore_column_types(self, df, dtype):
+        # iterate columns types and convert to the correct type.
+        # Need to do this after reading, because pd sets converter results to type object
+        # Need to do this before evaluating expressions, because numexpr (if installed) can't deal with type 'object'
+        for column, type in dtype.items():
+            # skip setting index types
+            if column in df.columns:
+                # convert column to the correct type
+                df[column] = df[column].astype(type)
+            elif column in df.index.names and isinstance(df.index, pd.MultiIndex):
+                # convert multi-index to the correct type
+                df.index = df.index.set_levels(df.index.levels[df.index.names.index(column)].astype(type), level=column)
+            elif column in df.index.names and not isinstance(df.index, pd.MultiIndex):
+                # convert single-level index to the correct type
+                df.index = df.index.astype(type)
 
     def _evaluate_expressions(self, df, mapping, index_columns):
         # a column header can contain a python expression. Evaluate these now that we've read all values from CSV.
@@ -526,7 +536,6 @@ class DB:
         df.insert(0, '__line__', line)
         return df
 
-
     def get_select_statement(self, table_name, header, where_clause=None):
         # get cnx from context
         cnx = cnx_context.cnx
@@ -663,7 +672,6 @@ class DB:
 
         # append deleted to the end
         return insert_and_updates + deleted
-
 
     def set_context(self, url, password):
         # create psycopg2 connection

@@ -148,6 +148,36 @@ def test_post_table_get_diff_with_expression(db, books):
     assert update.values.tolist() == expected_update
 
 
+def test_post_table_get_diff_with_expression_on_index(db, books):
+    # tests that an expression can include an index field. This requires that we convert the index value to a
+    # known type other than 'object'. Because, if numexpr is installed, then it fails if the type is object.
+    header = 'title[unique=true],description[exp=title]'
+
+    body = '''
+        War and Peace,a description, 
+    '''
+    create, update, delete = db.post_table_get_diff('books', header, None, body, update=True)
+
+    expected_update = [[0, 'War and Peace', 'War and Peace', '']]
+
+    assert update.values.tolist() == expected_update
+
+
+def test_post_table_get_diff_with_expression_on_same_field(db, books):
+    # tests that an expression can include an index field. This requires that we convert the index value to a
+    # known type other than 'object'. Because, if numexpr is installed, then it fails if the type is object.
+    header = 'title[unique=true],"description[exp=""title.str.cat(description, sep=\':\')""]"'
+
+    body = '''
+        War and Peace,a description, 
+    '''
+    create, update, delete = db.post_table_get_diff('books', header, None, body, update=True)
+
+    expected_update = [[0, 'War and Peace', 'War and Peace:a description', '']]
+
+    assert update.values.tolist() == expected_update
+
+
 def test_post_table_get_sql_no_changes(db, books, context):
     body = '''
         Emma, Jane Austen
@@ -241,6 +271,7 @@ def test_post_table_update_with_missing_unique_column(db, books, context):
     db.post_table_get_sql('books', 'title[unique=false], authorid(name)', None, body, update=True)
     # TODO: report errors in post_table_get_sql
 
+
 def test_execute_sql_no_commit(db, books, context):
     sql = [
         SimpleQueryExecutor(0, OperationType.INSERT, 'books', 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
@@ -249,7 +280,7 @@ def test_execute_sql_no_commit(db, books, context):
                             {'title': 'Witches', 'name': 'Charles Dickens'}, 'books.csv'),
         SimpleQueryExecutor(2, OperationType.UPDATE, 'books', 'update books set authorid = authors.author_id from authors where title = :title and authors.name = :name',
                             {'title': 'Anna Karenina', 'name': 'Leo Tolstoy'}, 'books.csv'),
-        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'}, 'books.csv' )
+        SimpleQueryExecutor(3, OperationType.DELETE, 'books', 'delete from books where title = :title', {'title': 'Catch-22'}, 'books.csv')
     ]
     result = db._execute_sql(sql, True, False)
 
@@ -434,11 +465,11 @@ def test_post_table_get_full_report(db, books, context):
                     'rows': 7,
                     'success': {'delete': 1, 'insert': 2, 'update': 2},
                     'total': {'delete': 1, 'failed': 1, 'insert': 2, 'operations': 6, 'success': 5, 'update': 3}
-        }, 'files': [{'context': 'my table',
-            'md5': '4d243d3873027da1af176f6e9e078f91',
-            'size': 259,
-            'table': 'books'}
-        ], 'rows': [
+                    }, 'files': [{'context': 'my table',
+                                  'md5': '4d243d3873027da1af176f6e9e078f91',
+                                  'size': 259,
+                                  'table': 'books'}
+                                 ], 'rows': [
             {'operation_type': OperationType.DELETE, 'success': True, 'rowcount': 1, 'table_name': 'books', 'context': 'my table',
              'query': 'delete from books where books.title = :title',
              'params': {'title': 'Catch-22'}},
@@ -511,7 +542,7 @@ def test_read_from_request(db, books, meta):
 
     df = db._read_from_request(mapping, body, 0)
 
-    dtypes = {'authorid(name)': 'string'}
+    dtypes = {'title': 'string', 'authorid(name)': 'string'}
     expected = pd.DataFrame([
         ['Emma', 0, 'Jane Austen'],
         ['War and Peace', 1, 'Leo Tolstoy'],
@@ -526,6 +557,7 @@ def test_read_from_request(db, books, meta):
 
     assert df.equals(expected)
 
+
 def test_read_from_request_trailing_space(db, books, meta):
     # test that trailing spaces are removed from the input
     table = 'books'
@@ -536,7 +568,7 @@ def test_read_from_request_trailing_space(db, books, meta):
     '''
     df = db._read_from_request(mapping, body, 0)
 
-    dtypes = {'authorid(name)': 'string'}
+    dtypes = {'title': 'string', 'authorid(name)': 'string'}
     expected = pd.DataFrame([
         ['Emma', 0, 'Jane Austen'],
     ],
@@ -544,6 +576,7 @@ def test_read_from_request_trailing_space(db, books, meta):
     ).astype(dtypes).set_index('title')
 
     assert df.equals(expected)
+
 
 def test_read_from_request_detect_duplicate(db, books, meta):
     # verify that duplicates in the input halts the import
