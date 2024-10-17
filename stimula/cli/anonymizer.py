@@ -83,8 +83,8 @@ class Anonymizer:
     def anonymize_word(self, x):
         # is the word capitalized?
         is_capitalized = len(x) > 1 and x[0].isupper() and x[1:].islower()
-        # n is the number of times to swap characters
-        n = max(2, len(x) // 8)
+        # n is the number of times to swap characters. Minimum must be an odd number to minimize the chance of the word left unchanged
+        n = max(3, len(x) // 8)
         # iterate n times
         for i in range(n):
             # create two random numbers, smaller than the length of the string
