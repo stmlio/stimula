@@ -1,3 +1,4 @@
+import hashlib
 import importlib
 import logging
 import os
@@ -8,6 +9,7 @@ import pandas as pd
 
 from stimula.compiler.header_compiler import HeaderCompiler
 from stimula.compiler.types_compiler import TypesCompiler
+from stimula.service.api_reader import ApiReader
 
 _logger = logging.getLogger(__name__)
 
@@ -82,8 +84,11 @@ class CsvReader:
         # pad dataframe with empty columns if we have more column names in use_columns than exist in the dataframe
         df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, index_columns, converters)
 
+        # invoke apis to retrieve additional data, such as attachments
+        self._invoke_apis(df_padded, mapping, index_columns)
+
         # evaluate column expressions, must do after restoring index and column types
-        self._evaluate_expressions(df_padded, mapping, index_columns)
+        self._evaluate_expressions(df_padded, mapping, column_names, index_columns)
 
         # insert a column with line numbers
         df_padded.insert(0, '__line__', range(0, len(df)))
@@ -184,7 +189,46 @@ class CsvReader:
 
         return df_padded
 
-    def _evaluate_expressions(self, df, mapping, index_columns):
+    def _invoke_apis(self, df, mapping, index_columns):
+        # a column header can contain an 'api' modifier. Invoke these now that we've read all values from CSV, but before evaluating expressions.
+
+        # drop index, so that we can use index columns in expressions
+        if index_columns:
+            df.reset_index(inplace=True)
+
+        # store original column names so we can restore them later
+        original_column_names = df.columns
+
+        # remove foreign keys and modifiers in column names so we can use the bare names in expressions
+        df.columns = df.columns.str.replace(r'\[.*\]', '', regex=True)
+        df.columns = df.columns.str.replace(r'\(.*\)', '', regex=True)
+
+        # now that we have all data, we can evaluate column expressions.
+        for column in mapping['columns']:
+            if 'api' in column:
+                # get column name, assuming a single attribute
+                column_name = column['attributes'][0]['name']
+
+                # assert that the column has a url modifier
+                assert 'url' in column, f"Column {column_name} has an 'api' modifier, but no 'url' modifier"
+
+                # drop all values in the column and set type to binary
+                df[column_name] = None
+                df[column_name] = df[column_name].astype('bytes')
+
+                # iterate rows and invoke the api
+                for index, row in df.iterrows():
+                    # read document and add the binary response to the row in the DataFrame
+                    df.at[index, column_name] = ApiReader().read_document(column['url'], row.to_dict())
+
+        # restore column names
+        df.columns = original_column_names
+
+        # restore index
+        if index_columns:
+            df.set_index(index_columns, inplace=True)
+
+    def _evaluate_expressions(self, df, mapping, column_names, index_columns):
         # a column header can contain a python expression. Evaluate these now that we've read all values from CSV.
 
         # drop index, so that we can use index columns in expressions
@@ -206,7 +250,9 @@ class CsvReader:
 
                 # evaluate expression of the form <target_column>=<expression>
                 expression = f"{column_name}={column['exp']}"
-                df.eval(expression, inplace=True)
+
+                # evaluate the expression, pass custom functions
+                df.eval(expression, inplace=True, local_dict={'checksum': checksum})
 
         # restore column names
         df.columns = original_column_names
@@ -215,8 +261,11 @@ class CsvReader:
         if index_columns:
             df.set_index(index_columns, inplace=True)
 
-        # remove skip columns, because we've evaluated expressions so we no longer need them. Match column name with 'skip=true':
-        df.drop(columns=[column for column in df.columns if 'skip=true' in column], errors='ignore', inplace=True)
+        # list all columns with 'skip=true' in their mapping, but not API results. Assume single attribute.
+        drop_column_names = [n for n, m in zip(column_names, mapping['columns']) if m.get('skip') and not m.get('api')]
+
+        # drop these columns, because we've evaluated expressions so we no longer need them. But keep API results, we'll use them later.
+        df.drop(columns=drop_column_names, errors='ignore', inplace=True)
 
     def _deduplicate(self, df, index_columns):
         # reset index
@@ -250,3 +299,8 @@ class CsvReader:
 
         # execute the post script
         return module.execute(df)
+
+
+def checksum(series):
+    # checksum function for custom expression. Return hex digest for all items in series an return as type string.
+    return series.apply(lambda x: hashlib.sha1(x.encode()).hexdigest()).astype('string')

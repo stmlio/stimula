@@ -142,6 +142,7 @@ def books(cnx):
 
 @pytest.fixture
 def ir_model_data(cnx):
+    # mimic the Odoo ir_model_data table that stores external ids
     with cnx.cursor() as cr:
         cr.execute('DROP TABLE IF EXISTS ir_model_data')
         cr.execute('''create table ir_model_data (
@@ -162,7 +163,26 @@ def ir_model_data(cnx):
 
         for line in external_ids:
             cr.execute("INSERT INTO ir_model_data(res_id, name, module, model) VALUES(%(res_id)s, %(name)s, %(module)s, %(model)s)", line)
-            # cr.execute("""select nextval('books_bookid_seq')""")
+
+        cnx.commit()
+
+
+@pytest.fixture
+def ir_attachment(cnx):
+    # mimic the Odoo ir_attachment table that stores external ids
+    with cnx.cursor() as cr:
+        cr.execute('DROP TABLE IF EXISTS ir_attachment')
+        cr.execute('''create table ir_attachment (
+            id serial primary key,
+            name varchar not null,
+            res_id integer,
+            res_model     varchar,
+            checksum      varchar(40));''')
+
+        ir_attachment = [{"name": "attachment 123.pdf", "res_id": 1, "res_model": "books", "checksum": "AB12"}]
+
+        for line in ir_attachment:
+            cr.execute("INSERT INTO ir_attachment(name, res_id, res_model, checksum) VALUES(%(name)s, %(res_id)s, %(res_model)s, %(checksum)s)", line)
 
         cnx.commit()
 

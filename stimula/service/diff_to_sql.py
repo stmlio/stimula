@@ -1,5 +1,6 @@
 """
-This class takes a diff and creates SQL statements for each diff type.
+This class takes a diff and creates query executors for each diff type.
+It also makes the split between using SQL, ORM or any other way to execute the queries.
 
 Author: Romke Jonker
 Email: romke@rnadesign.net

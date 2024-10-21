@@ -72,8 +72,13 @@ class HeaderParser(Parser):
         # push table name on stack
         self.table_stack = [(table, None)]
 
-        # parse the cells
-        parsed_cells = [self.parse(HeaderParser._lexer.tokenize(cell)) for cell in cells]
+        # parse the cells, keep a cell counter to raise a more informative error message
+        parsed_cells = []
+        for i, cell in enumerate(cells):
+            try:
+                parsed_cells.append(self.parse(HeaderParser._lexer.tokenize(cell)))
+            except Exception as e:
+                raise ValueError(f"Error parsing cell {i+1} '{cell}': {str(e)}")
 
         # pop the stack and verify it's empty
         table, _ = self.table_stack.pop()
@@ -133,11 +138,14 @@ class HeaderParser(Parser):
                     foreign_key['table'] = table.name
                     foreign_key['name'] = column_name
 
-                    # Odoo's ir_model_data requires a qualifier name. Find it in cell and remove the attribute.
-                    if 'qualifier' not in modifiers:
-                        raise ValueError(f"Column '{attribute['name']}' is not a foreign key and no 'qualifier' specified in modifiers")
-                    foreign_key['qualifier'] = modifiers['qualifier']
-                    del modifiers['qualifier']
+                    # Odoo's ir_model_data requires a qualifier name, verify that. For other extension tables, such as ir_attachment, the qualifier is optional.
+                    if table_name == 'ir_model_data' and 'qualifier' not in modifiers:
+                        raise ValueError(f"Column '{attribute['name']}' is an Odoo external ID column, but no 'qualifier' is specified in modifiers")
+
+                    # Find the qualifier in cell and remove the attribute.
+                    if 'qualifier' in modifiers:
+                        foreign_key['qualifier'] = modifiers['qualifier']
+                        del modifiers['qualifier']
 
                     # there may be an optional id attribute in the cell as well, move it to the attribute
                     if 'id' in modifiers:
