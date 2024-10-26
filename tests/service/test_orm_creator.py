@@ -11,7 +11,7 @@ def test_create_sql(meta, books, lexer):
     mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     executor = InsertOrmCreator()._create_executor(1, mapping, {}, None, None)
 
-    assert executor._query == 'select authors.author_id as author_id from authors where authors.name = :name'
+    assert executor._query == 'select authors.author_id as authorid from authors where authors.name = :name'
 
 
 def test_prepare_and_create_sql(meta, books, lexer):
@@ -25,6 +25,6 @@ def test_prepare_and_create_sql(meta, books, lexer):
     )
     executors = list(InsertOrmCreator().create_executors(mapping, inserts))
 
-    assert executors[0]._query == 'select authors.author_id as author_id from authors where authors.name = :name'
+    assert executors[0]._query == 'select authors.author_id as authorid from authors where authors.name = :name'
     assert executors[0]._query_values == {'name': 'Jane Austen'}
     assert executors[0]._orm_values == {'title': 'Pride and Prejudice'}

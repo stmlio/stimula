@@ -18,7 +18,7 @@ def test_join_query(books, meta, lexer, context):
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     result = OrmInsertCompiler().compile(mapping)
-    expected = 'select authors.author_id as author_id from authors where authors.name = :name'
+    expected = 'select authors.author_id as authorid from authors where authors.name = :name'
     assert result == expected
 
 
@@ -27,7 +27,7 @@ def test_join_alias(books, meta, lexer, context):
     header = 'title[unique=true], seriesid(title)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     result = OrmInsertCompiler().compile(mapping)
-    expected = 'select books_1.bookid as bookid from books as books_1 where books_1.title = :title_1'
+    expected = 'select books_1.bookid as seriesid from books as books_1 where books_1.title = :title_1'
     assert result == expected
 
 
@@ -36,7 +36,7 @@ def test_multiple_join_alias(books, meta, lexer, context):
     header = 'title[unique=true], seriesid(seriesid(title))'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     result = OrmInsertCompiler().compile(mapping)
-    expected = 'select books_1.bookid as bookid from books as books_1 left join books as books_2 on books_1.seriesid = books_2.bookid where books_2.title = :title_1'
+    expected = 'select books_1.bookid as seriesid from books as books_1 left join books as books_2 on books_1.seriesid = books_2.bookid where books_2.title = :title_1'
     assert result == expected
 
 
@@ -54,7 +54,7 @@ def test_colon_separated_columns(books, meta, lexer, context):
     header = 'title[unique=true], authorid(name:birthyear)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
     result = OrmInsertCompiler().compile(mapping)
-    expected = "select authors.author_id as author_id from authors where authors.name = :name and authors.birthyear = :birthyear"
+    expected = "select authors.author_id as authorid from authors where authors.name = :name and authors.birthyear = :birthyear"
     assert result == expected
 
 
@@ -63,7 +63,7 @@ def test_compact_multiple_join_alias(books, meta, lexer, context):
     header = 'title[unique=true], seriesid(title: seriesid(title))'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     result = OrmInsertCompiler().compile(mapping)
-    expected = 'select books_1.bookid as bookid from books as books_1 left join books as books_2 on books_1.seriesid = books_2.bookid where books_1.title = :title_1 and books_2.title = :title_2'
+    expected = 'select books_1.bookid as seriesid from books as books_1 left join books as books_2 on books_1.seriesid = books_2.bookid where books_1.title = :title_1 and books_2.title = :title_2'
     assert result == expected
 
 
@@ -76,7 +76,7 @@ def test_multiple_join_alias_in_different_order(books, meta, lexer, context):
     header = 'seriesid(seriesid(title): title), title[unique=true]'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     result = OrmInsertCompiler().compile(mapping)
-    expected = 'select books_1.bookid as bookid from books as books_1 left join books as books_2 on books_1.seriesid = books_2.bookid where books_2.title = :title and books_1.title = :title_1'
+    expected = 'select books_1.bookid as seriesid from books as books_1 left join books as books_2 on books_1.seriesid = books_2.bookid where books_2.title = :title and books_1.title = :title_1'
     assert result == expected
 
 

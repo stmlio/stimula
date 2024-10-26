@@ -20,7 +20,7 @@ def test_columns(books, lexer, meta):
     table = 'books'
     header = 'title, price'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True},
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'enabled': True}]}
     assert result == expected
@@ -45,7 +45,7 @@ def test_modifiers(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], price[x=1: y=2]'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'x': '1', 'y': '2', 'enabled': True}
     ]}
@@ -56,7 +56,7 @@ def test_modifier_sets(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true][x=1: y=2]'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'unique': True, 'x': '1', 'y': '2', 'enabled': True},
     ]}
     assert result == expected
@@ -66,11 +66,7 @@ def test_quoted_modifiers(books, lexer, meta):
     table = 'books'
     header = 'price[a="$=1": b="$>=2": c="$ like \'%abc%\'"]'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
-        {'attributes': [{'name': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
-        {'attributes': [{'name': 'price', 'type': 'numeric'}], 'x': '1', 'y': '2', 'enabled': True}
-    ]}
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'enabled': True, 'a': '$=1', 'b': '$>=2', 'c': "$ like '%abc%'"}
     ]}
     assert result == expected
@@ -87,7 +83,7 @@ def test_multiple_attributes(books, lexer, meta):
     table = 'books'
     header = 'bookid:title[unique=true], price'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'bookid', 'type': 'integer'}, {'name': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'enabled': True}]}
     assert result == expected
@@ -97,7 +93,7 @@ def test_foreign_key(books, lexer, meta):
     table = 'books'
     header = 'authorid(name:publisherid(publishername:country):birthyear)'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [
             {'name': 'authorid', 'foreign-key': {'table': 'authors', 'name': 'author_id', 'attributes': [
                 {'name': 'name', 'type': 'text'},
@@ -131,7 +127,7 @@ def test_default_value_header(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], price[default-value=10], description[default-value="this is a book"]'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'default-value': '10', 'enabled': True},
         {'attributes': [{'name': 'description', 'type': 'text'}], 'default-value': 'this is a book', 'enabled': True}
@@ -143,7 +139,7 @@ def test_escaped_strings(books, lexer, meta):
     table = 'books'
     header = 'title[unique=true], "price[default-value=10]", "description[default-value=""this, is a book""]"'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
         {'attributes': [{'name': 'price', 'type': 'numeric'}], 'default-value': '10', 'enabled': True},
         {'attributes': [{'name': 'description', 'type': 'text'}], 'default-value': 'this, is a book', 'enabled': True}
@@ -155,7 +151,7 @@ def test_extension_header(books, meta, ir_model_data):
     table = 'books'
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
         {'attributes': [
             {'name': 'bookid', 'foreign-key': {'extension': True, 'table': 'ir_model_data', 'name': 'res_id', 'qualifier': 'netsuite_books', 'attributes': [
@@ -170,7 +166,7 @@ def test_extension_in_foreign_table(books, meta, ir_model_data):
     table = 'books'
     header = 'title[unique=true], authorid(author_id(name))[table=ir_model_data: name=res_id: qualifier=netsuite_authors]'
     result = HeaderParser(meta, table).parse_csv(header)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
         {'attributes': [
             {'name': 'authorid', 'foreign-key': {'table': 'authors', 'name': 'author_id', 'attributes': [

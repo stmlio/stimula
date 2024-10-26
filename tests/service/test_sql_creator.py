@@ -193,7 +193,7 @@ def test_filter_mapping(books, meta, lexer):
     value_dict = {'authorid(name)': 'Jane Austen'}
 
     result = InsertSqlCreator()._filter_mapping(mapping, value_dict)
-    expected = {'table': 'books', 'columns': [
+    expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [
             {'name': 'authorid', 'foreign-key': {'attributes': [{'name': 'name', 'type': 'text'}], 'name': 'author_id', 'table': 'authors'}}
         ], 'enabled': True}

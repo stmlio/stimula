@@ -24,7 +24,7 @@ def test_compile_header(meta, ir_attachment):
 
     mapping = HeaderParser(meta, table_name).parse_csv(header)
 
-    expected = {'table': 'ir_attachment', 'columns': [
+    expected = {'table': 'ir_attachment', 'primary-key': 'id', 'columns': [
         {'attributes': [
             {'name': 'res_id', 'foreign-key': {'attributes': [{'name': 'bookid', 'type': 'integer'}], 'extension': True, 'name': 'title', 'table': 'books'}}
         ], 'enabled': True, 'unique': True},
@@ -54,8 +54,8 @@ def test_run_select_query(meta, ir_attachment):
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     df = DbReader().read_from_db(mapping, None)
     assert df.shape == (1, 4)
-    assert df.columns.tolist() == ['res_id(title)[unique=true]', 'name', 'res_model[default-value=account.move: unique=true]', 'checksum[exp=checksum(file): unique=true]']
-    assert (df.values == [['Emma', 'attachment 123.pdf', 'books', 'AB12']]).all()
+    assert df.columns.tolist() == ['res_id(title)[unique=true]', 'name', 'res_model[default-value=account.move: unique=true]', 'checksum[exp=@checksum(file): unique=true]']
+    assert (df.values == [['Emma', 'attachment 123.pdf', 'books', '2ee2a1fd441ab214ca7d4a9264809c668476c2b5']]).all()
 
 
 def test_file_connector_api():
