@@ -31,6 +31,14 @@ def test_multiple_join_query(books, meta, lexer, context):
     assert result == expected
 
 
+def test_unique_join_query(books, meta, lexer, context):
+    table = 'books'
+    header = 'title[unique=true], authorid(name)[unique=true], price'
+    mapping = HeaderParser(meta, table).parse_csv(header)
+    result = UpdateCompiler().compile(mapping)
+    expected = 'update books set price = :price from authors where books.title = :title and book.authorid = authors.author_id and authors.name = :name'
+    assert result == expected
+
 def test_join_alias(books, meta, lexer, context):
     table = 'books'
     header = 'title[unique=true], seriesid(title)'
