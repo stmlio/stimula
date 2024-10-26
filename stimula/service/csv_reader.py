@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import importlib
 import logging
@@ -16,10 +17,10 @@ _logger = logging.getLogger(__name__)
 
 class CsvReader:
     def read_from_request(self, mapping, body, skiprows, post_script=None):
-        # get columns and unique columns.
-        column_names = HeaderCompiler().compile_list(mapping, include_skip=True)
+        # get columns and unique columns. Include all columns, including skip and orm-only columns.
+        column_names = HeaderCompiler().compile_list(mapping, include_skip=True, include_orm_only=True)
         index_columns = HeaderCompiler().compile_list_unique(mapping)
-        column_types = TypesCompiler().compile(mapping, column_names, include_skip=True)
+        column_types = TypesCompiler().compile(mapping, column_names, include_skip=True, include_orm_only=True)
         deduplicate_columns = HeaderCompiler().compile_list_deduplicate(mapping)
 
         # assert that at least one column header is not empty
@@ -252,7 +253,7 @@ class CsvReader:
                 expression = f"{column_name}={column['exp']}"
 
                 # evaluate the expression, pass custom functions
-                df.eval(expression, inplace=True, local_dict={'checksum': checksum})
+                df.eval(expression, inplace=True, local_dict={'checksum': checksum, 'base64encode': base64encode})
 
         # restore column names
         df.columns = original_column_names
@@ -267,15 +268,18 @@ class CsvReader:
         # drop these columns, because we've evaluated expressions so we no longer need them. But keep API results, we'll use them later.
         df.drop(columns=drop_column_names, errors='ignore', inplace=True)
 
-    def _deduplicate(self, df, index_columns):
+    def _deduplicate(self, df, index_columns_to_deduplicate):
+        # get original index columns
+        original_index_columns = df.index.names
+
         # reset index
         df_reset = df.reset_index()
 
         # Remove duplicate rows based on the index column
-        df_unique = df_reset.drop_duplicates(subset=index_columns)
+        df_unique = df_reset.drop_duplicates(subset=index_columns_to_deduplicate)
 
         # Set the column back as the index
-        df_final = df_unique.set_index(index_columns)
+        df_final = df_unique.set_index(original_index_columns)
 
         return df_final
 
@@ -303,4 +307,39 @@ class CsvReader:
 
 def checksum(series):
     # checksum function for custom expression. Return hex digest for all items in series an return as type string.
-    return series.apply(lambda x: hashlib.sha1(x.encode()).hexdigest()).astype('string')
+    return series.apply(_hexdigest).astype('string')
+
+
+def _hexdigest(x):
+    # if x is None, return None
+    if pd.isna(x):
+        return None
+    # if x is str, encode and return hex digest
+    if isinstance(x, str):
+        return hashlib.sha1(x.encode()).hexdigest()
+    # if x is bytes, return hex digest
+    if isinstance(x, bytes):
+        return hashlib.sha1(x).hexdigest()
+    # else raise an exception
+    raise ValueError(f"Unsupported type {type(x)}")
+
+def base64encode(series):
+    # UU-encode function for custom expression.
+    return series.apply(_base64encode).astype('string')
+
+
+def _base64encode(x: str | bytes | None) -> str | None:
+    # Return None if the input is None
+    if x is None:
+        return None
+
+    # If the input is a string, encode it to bytes and Base64-encode
+    if isinstance(x, str):
+        return base64.b64encode(x.encode()).decode('utf-8')
+
+    # If the input is bytes, Base64-encode it directly
+    if isinstance(x, bytes):
+        return base64.b64encode(x).decode('utf-8')
+
+    # Raise an exception for unsupported types
+    raise ValueError(f"Unsupported type {type(x)}")
