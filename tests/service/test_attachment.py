@@ -50,7 +50,7 @@ def test_create_select_query(meta, ir_attachment):
 
 def test_run_select_query(meta, ir_attachment):
     table_name = 'ir_attachment'
-    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="checksum(file)": unique=true]'
+    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     df = DbReader().read_from_db(mapping, None)
     assert df.shape == (1, 4)
@@ -129,3 +129,36 @@ def test_checksum_expression_in_csv():
     df = CsvReader().read_from_request(mapping, csv, 0)
     assert df.shape == (1, 3)
     assert df.values[0][2] == hashlib.sha1(b'some string').hexdigest()
+
+
+def test_get_diff(books, ir_attachment, db, orm):
+    # verify that processing a table can insert and delete
+    body = '''
+   Emma, abcdefgh, document_1.pdf, account.move,, 1234567890
+    '''
+    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
+    create, update, delete = db.post_table_get_diff('ir_attachment', header, None, body, insert=True, update=True, delete=True, orm=orm)
+    assert len(create) == 1
+    assert update.empty
+    assert len(delete) == 1
+
+def test_get_diff_no_change(books, ir_attachment, db, orm):
+    # verify that processing a table with no changes results in empty diffs
+    body = '''
+   Emma, abcdefgh, attachment 123.pdf, account.move,, 1234567890
+    '''
+    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
+    create, update, delete = db.post_table_get_diff('ir_attachment', header, None, body, insert=True, update=True, delete=True, orm=orm)
+    assert len(create) == 1
+    assert update.empty
+    assert len(delete) == 1
+
+def test_get_diff_to_executor(books, ir_attachment, db, context, orm):
+    # verify that processing a table can insert and delete
+    body = '''
+   Emma, abcdefgh, document_1.pdf, account.move,, 1234567890
+    '''
+    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], '\
+             'file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true], datas[exp="@base64encode(file)": orm-only=true]'
+    result = db.post_table_get_full_report('ir_attachment', header, None, body, insert=True, update=True, delete=True, execute=True)
+    assert 1==1
