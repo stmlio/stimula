@@ -372,7 +372,7 @@ class StimulaCLI:
         if summary.get('commit', False):
             report += 'Transaction committed\n'
         else:
-            report += 'Transaction not committed\n'
+            report += 'Specify --commit (-C) to commit transaction.\n'
 
         return report
 
