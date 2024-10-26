@@ -13,13 +13,14 @@ from sqlalchemy import create_engine
 from stimula.service.auth import Auth
 from stimula.service.context import cnx_context
 from stimula.service.db import DB
+from tests.conftest import TestORM
 
 
 class Invoker:
     def __init__(self, secret_key, host, port):
         # for local client, the secret key does not depend on the database but is specified by the user
         self._auth = LocalAuth(lambda database: secret_key, host, port)
-        self._db = DB()
+        self._db = DB(lambda: TestORM())
 
     def set_context(self, token):
         # set context for processing of this request
