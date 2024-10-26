@@ -1,5 +1,7 @@
 import sys
 
+from stimula.service.abstract_orm import AbstractORM
+
 print('sys.path')
 print(sys.path)
 import os
@@ -25,6 +27,18 @@ class TestAuth(Auth):
         # return cnx, cr for caller to unpack
         return None, None
 
+class TestORM(AbstractORM):
+    def create(self, model_name: str, values: dict):
+        pass
+
+    def read(self, model_name: str, record_id: int):
+        pass
+
+    def update(self, model_name: str, record_id: int, values: dict):
+        pass
+
+    def delete(self, model_name: str, record_id: int):
+        pass
 
 @pytest.fixture
 def db_params():
@@ -52,8 +66,8 @@ def auth(db_params):
 
 
 @pytest.fixture
-def db():
-    return DB()
+def db(orm):
+    return DB(lambda: orm)
 
 
 @pytest.fixture
@@ -179,7 +193,7 @@ def ir_attachment(cnx):
             res_model     varchar,
             checksum      varchar(40));''')
 
-        ir_attachment = [{"name": "attachment 123.pdf", "res_id": 1, "res_model": "books", "checksum": "AB12"}]
+        ir_attachment = [{"name": "attachment 123.pdf", "res_id": 1, "res_model": "books", "checksum": "2ee2a1fd441ab214ca7d4a9264809c668476c2b5"}]
 
         for line in ir_attachment:
             cr.execute("INSERT INTO ir_attachment(name, res_id, res_model, checksum) VALUES(%(name)s, %(res_id)s, %(res_model)s, %(checksum)s)", line)
@@ -237,3 +251,7 @@ def test_table(cnx):
             cursor.execute("DROP TABLE IF EXISTS test")
             # execute create table statement
             cursor.execute("CREATE TABLE test (id integer)")
+
+@pytest.fixture
+def orm():
+    return TestORM()
