@@ -1,10 +1,10 @@
 from integration_tests.test_local import call_main
 
-DB_NAME = 'beauty'
+DB_NAME = 'afas18'
 DB_USER = 'odoo'
 DB_PASS = 'odoo'
 STIMULA_KEY = "secret"
-SHEET_ID = '1xmESHdfahhCoEfc5rESEdIl6v-UHFBP9W5u5WB2pUE4'
+SHEET_ID = '1NwrH7ltvAh0zi_RtdcQr4hMH6Jcmu96XcK9BYr0k9Xk'
 
 
 def _test_google_auth():
@@ -16,20 +16,20 @@ def test_auth():
 
 
 def test_post_single_file():
-    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f res_partner -e IUE -V')
+    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f res_partner -IU -V')
 
 
 def test_post_multiple_files():
-    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f res_users res_partner -e IUE -V')
+    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f res_users res_partner -IUD -V')
 
 
 def test_post_stml_file():
-    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f customer_contact.stml -e IUE -V')
+    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f Delivery1.stml -IU -V')
 
 
 def test_post_stml_file():
-    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f items_category.stml -e IUEC -V')
+    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f company_user.stml -IU -V')
 
 
 def test_post_multiple_stml_files():
-    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f items_template.stml items_product.stml -e IUEC -V')
+    call_main(f'stimula post -k {STIMULA_KEY} -g {SHEET_ID} -f Delivery.stml Contact.stml Invoice.stml -IUD -V')
