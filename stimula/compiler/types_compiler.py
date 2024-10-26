@@ -21,13 +21,13 @@ from numpy import isnan
 
 class TypesCompiler:
 
-    def compile(self, mapping, column_names, include_skip=False):
+    def compile(self, mapping, column_names, include_skip=False, include_orm_only=False):
         # only return enabled columns
         if 'columns' not in mapping:
             return {}
 
-        # process all columns to obtain the converters, include empty columns, but skip [skip=true] columsn unless otherwise requested
-        columns = [self._column(c) for c in mapping['columns'] if (not c.get('skip') or include_skip)]
+        # process all columns to obtain the converters, include empty columns, but skip [skip=true] columns unless otherwise requested
+        columns = [self._column(c) for c in mapping['columns'] if (include_skip or not c.get('skip')) and (include_orm_only or not c.get('orm-only'))]
 
         # create a dictionary of converters to read from csv
         read_csv_converters = {column_names[i]: column['read_csv_converter'] for i, column in enumerate(columns) if 'read_csv_converter' in column}

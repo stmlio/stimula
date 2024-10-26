@@ -4,8 +4,8 @@ This class compiles a mapping into an update query.
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
-from .alias_compiler import AliasCompiler
 from .insert_compiler import ForeignWhereClauseCompiler, FromClauseCompiler
+from .where_compiler import WhereClauseCompiler
 
 
 class UpdateCompiler:
@@ -21,7 +21,7 @@ class UpdateCompiler:
         update_clause = UpdateClauseCompiler().compile(mapping)
         from_clause = FromClauseCompiler(False).compile(mapping)
         where_clause = WhereClauseCompiler().compile(mapping)
-        foreign_where_clause = ForeignWhereClauseCompiler(False).compile(mapping)
+        foreign_where_clause = ForeignWhereClauseCompiler(False, False).compile(mapping)
 
         result = f'{update_clause}{from_clause}{where_clause}'
         if foreign_where_clause:
@@ -63,37 +63,3 @@ class UpdateClauseCompiler:
             target_name = foreign_key['name']
             # no need to recurse
             return f'{column_name} = {target_alias}.{target_name}'
-
-
-class WhereClauseCompiler:
-    def compile(self, mapping):
-        table_name = mapping['table']
-        # filter columns
-        clause_lists = [self._column(c, table_name) for c in mapping['columns']]
-        clauses = [clause for clause_list in clause_lists for clause in clause_list]
-
-        # must not be empty
-        if not clauses:
-            raise Exception('Header must have at least one unique column')
-
-        return ' where ' + ' and '.join(clauses)
-
-    def _column(self, column, table_name):
-        unique = column.get('unique', False)
-        if not unique:
-            return []
-
-        return [self._attribute(attribute, table_name) for attribute in column['attributes']]
-
-    def _attribute(self, attribute, alias):
-        column_name = attribute['name']
-        # this compiler is only for the base table, don't recurse foreign keys
-
-        if 'foreign-key' in attribute:
-            # restrict the foreign key to the base table
-            foreign_key = attribute['foreign-key']
-            return f'{alias}.{column_name} = {foreign_key["alias"]}.{foreign_key["name"]}'
-
-        # if no foreign key, restrict base table to value from parameter
-        parameter_name = attribute.get('parameter', f'{column_name}')
-        return f'{alias}.{column_name} = :{parameter_name}'

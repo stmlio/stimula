@@ -6,7 +6,9 @@ Email: romke@rnadesign.net
 """
 from itertools import chain
 
+from stimula.compiler.foreign_where_compiler import ForeignWhereClauseCompiler
 from stimula.compiler.insert_compiler import ReturningClauseCompiler
+from stimula.compiler.where_compiler import WhereClauseCompiler
 
 
 class DeleteCompiler:
@@ -21,7 +23,7 @@ class DeleteCompiler:
         table_name = mapping['table']
         using_clause = UsingClauseCompiler().compile(mapping)
         where_clause = WhereClauseCompiler().compile(mapping)
-        foreign_where_clause = ForeignWhereClauseCompiler().compile(mapping)
+        foreign_where_clause = ForeignWhereClauseCompiler(False, True).compile(mapping)
         # in a delete statement, the foreign where clause always needs an 'and'
         foreign_where_clause = ' and ' + foreign_where_clause if foreign_where_clause else ''
         # returning clause is needed if we need to delete from an extension table
@@ -86,87 +88,3 @@ class UsingClauseCompiler:
         return from_clause + ''.join(self._attributes(foreign_key['attributes'], target_alias, False))
 
 
-class WhereClauseCompiler:
-    # This compiler create the usual where clause, but adds statements to restrict the 'using' tables
-    def compile(self, mapping):
-        table_name = mapping['table']
-        # filter columns
-        clause_lists = [self._column(c, table_name) for c in mapping['columns']]
-        clauses = [clause for clause_list in clause_lists for clause in clause_list]
-
-        # must not be empty
-        if not clauses:
-            raise Exception('Header must have at least one unique column')
-
-        return ' where ' + ' and '.join(clauses)
-
-    def _column(self, column, table_name):
-        unique = column.get('unique', False)
-        if not unique:
-            return []
-
-        return [self._attribute(attribute, table_name) for attribute in column['attributes']]
-
-    def _attribute(self, attribute, alias):
-        # this compiler is only for the base table, don't recurse foreign keys
-        if not 'foreign-key' in attribute:
-            column_name = attribute['name']
-            parameter_name = attribute.get('parameter', f'{column_name}')
-            return f'{alias}.{column_name} = :{parameter_name}'
-
-        foreign_key = attribute['foreign-key']
-        target_name = foreign_key['table']
-        target_alias = foreign_key.get('alias', target_name)
-        target_column = foreign_key['name']
-        return f'{alias}.{attribute["name"]} = {target_alias}.{target_column}'
-
-
-class ForeignWhereClauseCompiler:
-
-    def __init__(self):
-        self._aliases = {}
-
-    def compile(self, mapping):
-        # glue cells together
-        table_name = mapping['table']
-        clauses = [self._column(c, table_name) for c in mapping['columns']]
-
-        return ' and '.join(chain(*clauses))
-
-    def _column(self, column, table):
-        # no need to list non-unique columns as 'using' table when creating a delete query
-        if not column.get('unique', False):
-            return []
-
-        return self._attributes(column['attributes'], table, True)
-
-    def _attributes(self, attributes, source_alias, is_root):
-        return chain(*[self._attribute(attribute, source_alias, is_root) for attribute in attributes])
-
-    def _attribute(self, attribute, alias, is_root_table):
-        if not 'foreign-key' in attribute:
-
-            # no where clause needed for root table
-            if is_root_table:
-                return []
-
-            # terminate foreign key with an equation
-            parameter_name = attribute.get('parameter', f'{attribute["name"]}')
-            return [f'{alias}.{attribute["name"]} = :{parameter_name}']
-
-        foreign_key = attribute['foreign-key']
-        target_name = foreign_key['table']
-        target_alias = foreign_key.get('alias', target_name)
-
-        # recurse
-        where_clause = self._attributes(foreign_key['attributes'], target_alias, False)
-
-        # add extension conditions if this is the root of a delete query
-        if is_root_table and foreign_key.get('extension'):
-            # assume for now that the alias is the table name. This is fine as long as we're not joining the same table multiple times
-            model = alias.replace('_', '.')
-            extension_clause = [f"{target_alias}.module = '{foreign_key['qualifier']}'",
-                                f"{target_alias}.model = '{model}'"]
-            where_clause = chain(where_clause, extension_clause)
-
-        return where_clause

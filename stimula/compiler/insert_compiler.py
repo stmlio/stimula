@@ -4,9 +4,9 @@ This class generates insert statements based on a mapping.
 Author: Romke Jonker
 Email: romke@rnadesign.net
 """
-import re
 from itertools import chain
 
+from stimula.compiler.foreign_where_compiler import ForeignWhereClauseCompiler
 from stimula.compiler.select_compiler import SelectCompiler
 
 
@@ -27,7 +27,7 @@ class InsertCompiler:
         insert_clause = InsertClauseCompiler().compile(mapping)
         select_clause = SelectClauseCompiler().compile(mapping)
         from_clause = FromClauseCompiler(True).compile(mapping)
-        where_clause = ForeignWhereClauseCompiler(True).compile(mapping)
+        where_clause = ForeignWhereClauseCompiler(True, False).compile(mapping)
         returning_clause = ReturningClauseCompiler().compile(mapping)
 
         # this where clause is also used in update query. Here we need 'where'
@@ -109,6 +109,16 @@ class FromClauseCompiler:
         self._is_insert_query = is_insert_query
 
     def compile(self, mapping):
+        # compile and get result as list
+        clauses = self.compile_as_list(mapping)
+
+        if not clauses:
+            return ''
+        return ' from ' + ', '.join(clauses)
+
+    def compile_as_list(self, mapping):
+        # compiles columns and returns as list, so we can also use it to create ORM foreign key queries
+
         # get table
         table = mapping['table']
 
@@ -116,10 +126,7 @@ class FromClauseCompiler:
         columns = [self._column(c, table) for c in mapping['columns']]
 
         # filter out empty columns that don't need a from clause
-        filtered_columns = [column for column in columns if column]
-        if not filtered_columns:
-            return ''
-        return ' from ' + ', '.join(filtered_columns)
+        return [column for column in columns if column]
 
     def _column(self, column, table):
         attributes = self._attributes(column['attributes'], table, True)
@@ -168,61 +175,8 @@ class FromClauseCompiler:
                 table_name = SelectCompiler().get_model_name(source_alias)
                 from_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{qualifier}\''
 
-
         # recurse
         return from_clause + self._attributes(foreign_key['attributes'], target_alias, False)
-
-
-
-class ForeignWhereClauseCompiler:
-
-    def __init__(self, is_insert_query):
-        # if this is an insert query, we must not join with extension tables
-        self._is_insert_query = is_insert_query
-        self._aliases = {}
-
-    def compile(self, mapping):
-        # glue cells together
-        table_name = mapping['table']
-        clauses = [self._column(c, table_name) for c in mapping['columns']]
-
-        return ' and '.join(chain(*clauses))
-
-    def _column(self, column, table):
-        return self._attributes(column['attributes'], table, True)
-
-    def _attributes(self, attributes, source_alias, is_root):
-        return chain(*[self._attribute(attribute, source_alias, is_root) for attribute in attributes])
-
-    def _attribute(self, attribute, alias, is_root_table):
-        if not 'foreign-key' in attribute:
-
-            # only add where clauses for joined tables, but do register for alias
-            if is_root_table:
-                return []
-            parameter_name = attribute.get('parameter', f'{attribute["name"]}')
-            return [f'{alias}.{attribute["name"]} = :{parameter_name}']
-
-        foreign_key = attribute['foreign-key']
-        target_name = foreign_key['table']
-        target_alias = foreign_key.get('alias', target_name)
-
-        # don't add extension conditions if this is an insert query
-        if is_root_table and foreign_key.get('extension') and self._is_insert_query:
-            return []
-
-        # recurse
-        where_clause = self._attributes(foreign_key['attributes'], target_alias, False)
-
-        # add extension conditions if this is the root of an update query
-        if is_root_table and foreign_key.get('extension') and not self._is_insert_query:
-            # assume for now that the alias is the table name. This is fine as long as we're not joining the same table multiple times
-            model = alias.replace('_', '.')
-            extension_clause = [f"{target_alias}.module = '{foreign_key['qualifier']}'",
-                                f"{target_alias}.model = '{model}'"]
-            where_clause = chain(where_clause, extension_clause)
-
-        return where_clause
 
 
 class ReturningClauseCompiler:
@@ -257,4 +211,3 @@ class ReturningClauseCompiler:
             return None
         # extension, so return the id to return from the query. Default to 'id' bec/ that's what Odoo uses
         return attribute['foreign-key'].get('id', 'id')
-

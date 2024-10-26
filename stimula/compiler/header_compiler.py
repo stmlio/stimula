@@ -23,12 +23,12 @@ class HeaderCompiler:
             return ''
         return ', '.join([self._column(c) for c in mapping['columns'] if c.get('unique', False)])
 
-    def compile_list(self, mapping, enabled=False, include_skip=False):
+    def compile_list(self, mapping, enabled=False, include_skip=False, include_orm_only=False):
         # if enabled, only return enabled columns.
         # if include_skip, then include skip columns. This is useful when reading from CSV
         if 'columns' not in mapping:
             return []
-        return [self._column(c) for c in mapping['columns'] if (not enabled or c.get('enabled', False)) and (include_skip or not c.get('skip'))]
+        return [self._column(c) for c in mapping['columns'] if (not enabled or c.get('enabled', False)) and (include_skip or not c.get('skip')) and (include_orm_only or not c.get('orm-only'))]
 
     def compile_list_unique(self, mapping):
         if 'columns' not in mapping:
@@ -39,7 +39,7 @@ class HeaderCompiler:
         # return list of non-unique columns
         if 'columns' not in mapping:
             return []
-        # remove unique columns, also remove 'skip' columns because we don't want to write them to DB
+        # remove unique columns, also remove 'skip' columns because we don't want to write them to DB. Leave in 'orm-only' columns because we need them to write to ORM.
         columns = [self._column(c) for c in mapping['columns'] if not c.get('unique', False) and not c.get('skip', False)]
         # remove empty columns
         return [c for c in columns if c]

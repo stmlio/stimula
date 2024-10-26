@@ -56,6 +56,9 @@ class HeaderParser(Parser):
         # resolve table
         table = self._resolve_table(self._table_name)
 
+        # find primary key, required for ORM operations
+        primary_keys = self.find_primary_keys(table)
+
         # an empty string can either be an empty header or a header with a single empty column. Let's return an empty header in that case.
         if header.strip() == '':
             return {'table': self._table_name}
@@ -89,14 +92,17 @@ class HeaderParser(Parser):
             self._complete_extension_foreign_key(cell, cell)
 
         # Verify that all attributes exist in the table by checking that they have a type.
-        # For columns marked as 'skip=true', the column does not have to exist in the table.
+        # For columns marked as 'skip=true' or 'orm-only=true', the column does not have to exist in the table.
         # We can't do this check during parsing of the attribute, bec/ then the modifiers aren't known yet.
         for cell in parsed_cells:
-            if not cell.get('skip'):
+            if not cell.get('skip') and not cell.get('orm-only'):
                 for a in cell.get('attributes', []):
                     self._verify_attribute(a, table.name)
 
-        return {'table': table.name, 'columns': parsed_cells}
+        if len(primary_keys):
+            return {'table': table.name, 'primary-key': primary_keys[0], 'columns': parsed_cells}
+        else:
+            return {'table': table.name, 'columns': parsed_cells}
 
     def _verify_attribute(self, attribute, table):
         if 'foreign-key' in attribute:
@@ -267,6 +273,11 @@ class HeaderParser(Parser):
         if table is None:
             raise ValueError(f"Table '{table_name}' not found")
         return table
+
+    def find_primary_keys(self, table):
+        # return names of primary keys in table
+        return [column.name for column in table.primary_key]
+
 
     def error(self, token):
         msg = 'Parse error'

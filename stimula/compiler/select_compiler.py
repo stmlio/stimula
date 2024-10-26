@@ -58,8 +58,8 @@ class SelectCompiler:
 class SelectClauseCompiler:
     def compile(self, mapping):
         table_name = mapping['table']
-        # comma separate cells. Skip cells with skip=true modifier. We need those when reading CSV, but not when reading from DB
-        return 'select ' + ', '.join([self._column(c, table_name) for c in mapping['columns'] if not c.get('skip')])
+        # comma separate cells. Skip cells with skip=true or orm-only modifier. We need those when reading CSV, but not when reading from DB
+        return 'select ' + ', '.join([self._column(c, table_name) for c in mapping['columns'] if not c.get('skip') and not c.get('orm-only')])
 
     def _column(self, column, table_name):
         # column may be empty
