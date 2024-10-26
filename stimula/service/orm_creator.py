@@ -1,39 +1,39 @@
 """
-This script provides the concrete ExecutorCreator implementation to insert, update and delete using SQL.
+This script provides the concrete ExecutorCreator implementation to insert, update and delete using ORM.
 
 Author: Romke Jonker
 Email: romke@stml.io
 """
 
 from .executor_creator import ExecutorCreator
+from .orm_executor import CreateOrmExecutor
 from .query_executor import SimpleQueryExecutor, DependentQueryExecutor, OperationType
 from ..compiler.delete_compiler import DeleteCompiler
 from ..compiler.header_compiler import HeaderCompiler
-from ..compiler.insert_compiler import InsertCompiler, ReturningClauseCompiler
+from ..compiler.insert_compiler import ReturningClauseCompiler
+from ..compiler.orm_insert_compiler import OrmInsertCompiler, OrmParameterNamesCompiler
 from ..compiler.update_compiler import UpdateCompiler
 
 
-class InsertSqlCreator(ExecutorCreator):
+class InsertOrmCreator(ExecutorCreator):
     def __init__(self):
         super().__init__()
         self.operation_type = OperationType.INSERT
 
     def _create_executor(self, line_number, mapping, values, context, orm):
         # Compile the filtered tree to get the query.
-        query = InsertCompiler().compile(mapping)
+        query = OrmInsertCompiler().compile(mapping)
 
-        # is there an extension on the root table?
-        if not ReturningClauseCompiler().compile(mapping):
-            # yield query and split columns
-            return SimpleQueryExecutor(line_number, self.operation_type, mapping['table'], query, values, context)
+        # get parameter names for orm
+        orm_parameter_names = OrmParameterNamesCompiler().compile(mapping)
 
-        else:
+        # split values in query and orm values
+        query_values = {key: value for key, value in values.items() if key not in orm_parameter_names}
+        orm_values = {key: value for key, value in values.items() if key in orm_parameter_names}
 
-            # create a separate query for the extension
-            dependent_query = self._create_extension_insert_query(mapping, values)
+        # return query
+        return CreateOrmExecutor(line_number, self.operation_type, mapping['table'], query, query_values, orm_values, context, orm)
 
-            # return dependent query executor to execute both queries
-            return DependentQueryExecutor(line_number, self.operation_type, mapping['table'], context, (query, values), dependent_query)
 
     def _create_non_unique_value_dict(self, mapping, row):
         # call super to get all other columns and values
@@ -45,16 +45,8 @@ class InsertSqlCreator(ExecutorCreator):
         return non_unique_value_dict
 
 
-    def _create_extension_insert_query(self, mapping, param):
-        # get table, name parameter name and values
-        table, name_parameter_name, values = ExtensionValueHelper().get_extension_parameter_values(mapping, param)
 
-        # create insert query
-        sql = f'insert into {table} (name, module, model, res_id) values (:{name_parameter_name}, :module, :model, :res_id)'
-        return sql, values
-
-
-class UpdateSqlCreator(ExecutorCreator):
+class UpdateOrmCreator(ExecutorCreator):
 
     def __init__(self):
         super().__init__()
@@ -141,7 +133,7 @@ class UpdateSqlCreator(ExecutorCreator):
 
 
 
-class DeleteSqlCreator(ExecutorCreator):
+class DeleteOrmCreator(ExecutorCreator):
     def __init__(self):
         super().__init__()
         self.operation_type = OperationType.DELETE

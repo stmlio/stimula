@@ -13,7 +13,7 @@ In particular, it allows for dependent queries, where the result of the first qu
 _logger = logging.getLogger(__name__)
 
 
-class QueryExecutor(ABC):
+class Executor(ABC):
     def __init__(self, line_number, operation_type, table_name, context):
         self.line_number = line_number
         self.operation_type = operation_type
@@ -40,7 +40,7 @@ class QueryExecutor(ABC):
         return re.sub(r':(\w+)', r'%(\1)s', query)
 
 
-class SimpleQueryExecutor(QueryExecutor):
+class SimpleQueryExecutor(Executor):
     def __init__(self, line_number, operation_type, table_name, query, params, context):
         super().__init__(line_number, operation_type, table_name, context)
         self.query = query
@@ -83,7 +83,7 @@ class SimpleQueryExecutor(QueryExecutor):
         return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self.query, self.params, self.context)
 
 # This class is used to store input rows that failed to compile into a query
-class FailedQueryExecutor(QueryExecutor):
+class FailedQueryExecutor(Executor):
     def __init__(self, line_number, operation_type, table_name, context, error):
         super().__init__(line_number, operation_type, table_name, context)
         self.error = error
@@ -101,7 +101,7 @@ class FailedQueryExecutor(QueryExecutor):
 This class allows for dependent queries, where the result of the first query is used as a parameter in the second query.
 This is useful for extensions, such as the ir_model_data table in Odoo.
 '''
-class DependentQueryExecutor(QueryExecutor):
+class DependentQueryExecutor(Executor):
     def __init__(self, line_number, operation_type, table_name, context, initial_query, dependent_query):
         super().__init__(line_number, operation_type, table_name, context)
         self.query = initial_query[0]

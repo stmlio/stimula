@@ -6,6 +6,7 @@ Email: romke@rnadesign.net
 """
 import logging
 import re
+from typing import Optional
 
 import pandas as pd
 import psycopg2
@@ -18,10 +19,11 @@ from stimula.header.csv_header_parser import HeaderParser
 from stimula.header.header_lexer import HeaderLexer
 from stimula.header.header_merger import HeaderMerger
 from stimula.header.odoo_header_parser import OdooHeaderParser
+from .abstract_orm import AbstractORM
 from .context import cnx_context, get_metadata
 from .csv_reader import CsvReader
 from .db_reader import DbReader
-from .diff_to_sql import DiffToSql
+from .diff_to_executor import DiffToExecutor
 from .query_executor import OperationType
 from .reporter import Reporter
 
@@ -29,9 +31,11 @@ _logger = logging.getLogger(__name__)
 
 
 class DB:
-    def __init__(self):
+    def __init__(self, orm_function=None):
         self._lexer = HeaderLexer()
-        self._diff_to_sql = DiffToSql()
+        self._diff_to_sql = DiffToExecutor()
+        # delay orm creation until needed
+        self._orm_function = orm_function
 
     def get_tables(self, filter=None):
 
@@ -138,9 +142,9 @@ class DB:
         # convert dataframe to csv
         return df.to_csv(index=False, escapechar=escapechar)
 
-    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None):
+    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None, orm=None):
         # create diffs and sql
-        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context)
+        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm)
         # if execute
         if execute:
             # execute sql statements
@@ -165,8 +169,12 @@ class DB:
 
     def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
                                    post_script=None, context=None):
+
+        # create orm service if function is provided
+        orm: Optional[AbstractORM] = self._orm_function() if self._orm_function else None
+
         # create diffs and sql
-        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context)
+        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm=orm)
 
         # execute sql statements
         execution_results = self._execute_sql(query_executors, execute, commit)
@@ -184,6 +192,9 @@ class DB:
 
         query_executors = []
 
+        # create orm service if function is provided
+        orm: Optional[AbstractORM] = self._orm_function() if self._orm_function else None
+
         # Iterate over tables here.
         for table_name, file_context, content in zip(table_names, context, contents):
             # decode binary content
@@ -193,7 +204,7 @@ class DB:
             header = text_content.split('\n', 1)[0]
 
             # create diffs and sql
-            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, post_script, file_context)
+            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, post_script, file_context, orm=orm)
             query_executors.extend(qe)
 
         # execute sql statements
@@ -238,7 +249,7 @@ class DB:
     def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
         pass
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context):
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None):
         # get cnx from context
         cnx = cnx_context.cnx
 
@@ -263,7 +274,7 @@ class DB:
         diffs = self._compare(df_request, df_db, insert, update, delete)
 
         # create sql statements and parameters
-        sqls = self._diff_to_sql.diff_sql(mapping, diffs, context)
+        sqls = self._diff_to_sql.diff_executor(mapping, diffs, context, orm)
 
         return diffs, sqls
 
@@ -291,8 +302,11 @@ class DB:
         # Sort the right DataFrame to match the index of the left DataFrame
         right_df_sorted = right.reindex(left.index)
 
-        # left (from request) has __line__ column. Create a copy without line numbers for comparison
-        left_no_line = left.drop(columns=['__line__'])
+        # get columns that are in left but not in right, such as __line__ and API filled columns
+        drop_column_names = set(left.columns).difference(right_df_sorted.columns)
+
+        # drop these columns from left
+        left_no_line = left.drop(columns=drop_column_names, errors='ignore')
 
         # get mask of cells that are N/A or '' in left and right
         mask = (left_no_line.isna() | left_no_line.eq('')) & (right_df_sorted.isna() | right_df_sorted.eq(''))
@@ -304,8 +318,9 @@ class DB:
         # compare remaining rows
         updates = left_no_line.compare(right_df_sorted)
 
-        # insert __line__ column, recovering line numbers from left by index
-        updates['__line__'] = left.loc[updates.index]['__line__']
+        # restore dropped columns from left into updates
+        for column_name in drop_column_names:
+            updates[column_name] = left.loc[updates.index][column_name]
 
         # reset index for updates to match the insert and deletes
         updates.reset_index(inplace=True)

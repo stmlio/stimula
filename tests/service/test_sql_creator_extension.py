@@ -25,7 +25,7 @@ def test_insert_sql_creator_external_id(books, meta):
     ], columns=['__line__', 'title[unique=true]', 'bookid(name)'])
 
     # get queries
-    inserts = InsertSqlCreator().create_sql(mapping, diff)
+    inserts = InsertSqlCreator().create_executors(mapping, diff)
     actual = list(inserts)[0].queries()
 
     expected = [('insert into books(title) select :title returning books.id', {'name': '12345', 'title': 'Pride and Prejudice'}),
@@ -48,7 +48,7 @@ def test_insert_sql_creator_external_id_unique(books, meta, ir_model_data):
     ], columns=['__line__', 'title', 'bookid(name)[unique=true]'])
 
     # get queries
-    inserts = InsertSqlCreator().create_sql(mapping, diff)
+    inserts = InsertSqlCreator().create_executors(mapping, diff)
     actual = list(inserts)[0].queries()
 
     expected = [('insert into books(title) select :title returning books.id', {'name': '11112', 'title': 'Emma'}),
@@ -70,7 +70,7 @@ def test_update_sql_creator_unmodified_external_id(books, meta):
     ], columns=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
 
     # get queries
-    updates = UpdateSqlCreator().create_sql(mapping, diff)
+    updates = UpdateSqlCreator().create_executors(mapping, diff)
     actual = list(updates)[0].queries()
 
     expected = [('update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', {'name': 'Joseph Heller', 'title': 'Pride and Prejudice'})]
@@ -89,7 +89,7 @@ def test_update_sql_creator_unique_external_id(books, meta):
     ], columns=['__line__', ('title', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('bookid(name)[unique=true]', '')])
 
     # get queries
-    updates = UpdateSqlCreator().create_sql(mapping, diff)
+    updates = UpdateSqlCreator().create_executors(mapping, diff)
     actual = list(updates)[0].queries()
 
     expected = [("update books set authorid = authors.author_id from authors, ir_model_data where books.bookid = ir_model_data.res_id and authors.name = :name and ir_model_data.name = :name_1 and ir_model_data.module = 'netsuite_books' and ir_model_data.model = 'books'", {'name': 'Joseph Heller', 'name_1': '11111'})]
@@ -108,7 +108,7 @@ def test_delete_sql_creator_external_id(books, meta):
     ], columns=['__line__', 'title[unique=true]', 'bookid(name)'])
 
     # get queries
-    deletes = DeleteSqlCreator().create_sql(mapping, diff)
+    deletes = DeleteSqlCreator().create_executors(mapping, diff)
     actual = list(deletes)[0].queries()
 
     expected = [('delete from books where books.title = :title returning books.id', {'name': '12345', 'title': 'Pride and Prejudice'}),

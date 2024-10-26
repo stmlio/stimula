@@ -5,8 +5,9 @@ from numpy import int64, nan
 
 from stimula.compiler.alias_compiler import AliasCompiler
 from stimula.header.csv_header_parser import HeaderParser
+from stimula.service.executor_creator import ExecutorCreator
 from stimula.service.query_executor import OperationType
-from stimula.service.sql_creator import SqlCreator, InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
+from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
 
 
 def test_create_sql(meta, books, lexer):
@@ -18,7 +19,7 @@ def test_create_sql(meta, books, lexer):
     ],
         columns=['title[unique=true]', '__line__', 'authorid(name)']
     )
-    result = list(InsertSqlCreator().create_sql(mapping, inserts))
+    result = list(InsertSqlCreator().create_executors(mapping, inserts))
 
     expected = ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
                 {'title': 'Pride and Prejudice', 'name': 'Jane Austen'})
@@ -39,7 +40,7 @@ def test_create_sql_multiple_update_rows(meta, books, lexer):
     ],
         columns=columns
     )
-    updates = list(UpdateSqlCreator().create_sql(mapping, updates))
+    updates = list(UpdateSqlCreator().create_executors(mapping, updates))
 
     expected = [
         ('update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', {'name': 'Charles Dickens', 'title': 'Pride and Prejudice'}),
@@ -56,10 +57,10 @@ def test_create_sql_row_insert(meta, books, lexer):
     # create series with column names
     row = pd.Series([0, 'Pride and Prejudice', 'Jane Austen'], index=['__line__', 'title[unique=true]', 'authorid(name)'])
 
-    result = InsertSqlCreator()._create_sql_row(mapping, row)
+    executor = InsertSqlCreator()._prepare_and_create_executor(mapping, row, 1)
     expected = (OperationType.INSERT, 'insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name',
                 {'title': 'Pride and Prejudice', 'name': 'Jane Austen'})
-    assert result == expected
+    assert executor.query, executor.params == expected
 
 
 def test_create_sql_row_insert_skip_empty_column(books, meta, lexer):
@@ -67,11 +68,11 @@ def test_create_sql_row_insert_skip_empty_column(books, meta, lexer):
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     row = pd.Series([0, 'Pride and Prejudice', ''], index=['__line__', 'title[unique=true]', 'authorid(name)'])
-    result = InsertSqlCreator()._create_sql_row(mapping, row)
+    executor = InsertSqlCreator()._prepare_and_create_executor(mapping, row, 1)
 
     expected = (OperationType.INSERT, 'insert into books(title) select :title', {'title': 'Pride and Prejudice'})
 
-    assert result == expected
+    assert executor.query, executor.params == expected
 
 
 def test_create_sql_row_insert_skip_nan(books, meta, lexer):
@@ -79,11 +80,11 @@ def test_create_sql_row_insert_skip_nan(books, meta, lexer):
     header = 'title[unique=true], authorid(name)'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     row = pd.Series([0, 'Pride and Prejudice', nan], index=['__line__', 'title[unique=true]', 'authorid(name)'])
-    result = InsertSqlCreator()._create_sql_row(mapping, row)
+    executor = InsertSqlCreator()._prepare_and_create_executor(mapping, row, 1)
 
     expected = (OperationType.INSERT, 'insert into books(title) select :title', {'title': 'Pride and Prejudice'})
 
-    assert result == expected
+    assert executor.query, executor.params == expected
 
 def test_create_sql_row_insert_empty_row_must_fail(books, meta, lexer):
     table_name = 'books'
@@ -92,7 +93,7 @@ def test_create_sql_row_insert_empty_row_must_fail(books, meta, lexer):
     row = pd.Series([0, nan, nan], index=['__line__', 'title', 'authorid(name)'])
 
     with pytest.raises(AssertionError):
-        InsertSqlCreator()._create_sql_row(mapping, row)
+        InsertSqlCreator()._prepare_mapping_and_values(mapping, row)
 
 
 def test_create_sql_row_update(books, meta, lexer):
@@ -101,12 +102,12 @@ def test_create_sql_row_update(books, meta, lexer):
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     # test that it creates an update sql query and a value dict
     row = pd.Series([(0,), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'], index=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
-    result = UpdateSqlCreator()._create_sql_row(mapping, row)
+    executor = UpdateSqlCreator()._prepare_and_create_executor(mapping, row, 1)
 
     expected = (OperationType.UPDATE, 'update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name',
                 {'title': 'Pride and Prejudice', 'name': 'Joseph Heller'})
 
-    assert result == expected
+    assert executor.query, executor.params == expected
 
 
 def test_create_sql_row_update_no_changes(books, meta, lexer):
@@ -116,7 +117,7 @@ def test_create_sql_row_update_no_changes(books, meta, lexer):
         mapping = HeaderParser(meta, 'books').parse_csv(header)
         AliasCompiler().compile(mapping)
         row = pd.Series(['Pride and Prejudice', 'Jane Austen', 'Jane Austen'], index=[('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
-        UpdateSqlCreator()._create_sql_row(mapping, row)
+        UpdateSqlCreator()._prepare_mapping_and_values(mapping, row)
 
 
 def test_create_sql_row_delete(books, meta, lexer):
@@ -127,10 +128,11 @@ def test_create_sql_row_delete(books, meta, lexer):
     # create series with column names
     row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
 
-    result = DeleteSqlCreator()._create_sql_row(mapping, row)
+    executor = DeleteSqlCreator()._prepare_and_create_executor(mapping, row, 1)
+
     expected = (OperationType.DELETE, 'delete from books where books.title = :title',
                 {'title': 'Pride and Prejudice'})
-    assert result == expected
+    assert executor.query, executor.params == expected
 
 
 def test_delete_sql_split_columns(books, meta, lexer):
@@ -138,11 +140,11 @@ def test_delete_sql_split_columns(books, meta, lexer):
     header = 'title:authorid[unique=true], description'
     mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
     row = pd.Series(['Pride and Prejudice:1'], index=['title:authorid[unique=true]'])
-    result = DeleteSqlCreator()._create_sql_row(mapping, row)
+    executor = DeleteSqlCreator()._prepare_and_create_executor(mapping, row, 1)
 
     expected = (OperationType.DELETE, 'delete from books where books.title = :title and books.authorid = :authorid',
                 {'title': 'Pride and Prejudice', 'authorid': 1})
-    assert result == expected
+    assert executor.query, executor.params == expected
 
 
 def test_create_unique_value_dict(books, meta, lexer):
@@ -153,7 +155,7 @@ def test_create_unique_value_dict(books, meta, lexer):
     # create series with column names
     row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
 
-    result = SqlCreator()._create_unique_value_dict(mapping, row)
+    result = InsertSqlCreator()._create_unique_value_dict(mapping, row)
     expected = {'title[unique=true]': 'Pride and Prejudice'}
     assert result == expected
 
@@ -166,7 +168,7 @@ def test_create_non_unique_value_dict(books, meta, lexer):
     # create series with column names
     row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
 
-    result = SqlCreator()._create_non_unique_value_dict(mapping, row)
+    result = InsertSqlCreator()._create_non_unique_value_dict(mapping, row)
     expected = {'authorid(name)': 'Jane Austen'}
     assert result == expected
 
@@ -190,7 +192,7 @@ def test_filter_mapping(books, meta, lexer):
     # create value dict
     value_dict = {'authorid(name)': 'Jane Austen'}
 
-    result = SqlCreator()._filter_mapping(mapping, value_dict)
+    result = InsertSqlCreator()._filter_mapping(mapping, value_dict)
     expected = {'table': 'books', 'columns': [
         {'attributes': [
             {'name': 'authorid', 'foreign-key': {'attributes': [{'name': 'name', 'type': 'text'}], 'name': 'author_id', 'table': 'authors'}}
@@ -208,7 +210,7 @@ def test_map_parameter_names_with_values(books, meta, lexer):
     parameter_names = [('title',), ('name',)]
     value_dict = {'title[unique=true]': 'Pride and Prejudice', 'authorid(name)': 'Jane Austen'}
 
-    result = SqlCreator()._map_parameter_names_with_values(mapping, parameter_names, value_dict)
+    result = InsertSqlCreator()._map_parameter_names_with_values(mapping, parameter_names, value_dict)
     expected = {('title',): 'Pride and Prejudice', ('name',): 'Jane Austen'}
     assert result == expected
 
@@ -218,7 +220,7 @@ def test_split_columns():
     parameter_names = [('title',), ('name', 'year')]
     value_dict = {('title',): 'Pride and Prejudice', ('name', 'year'): 'Jane Austen:1813'}
 
-    result = SqlCreator()._split_columns(parameter_names, value_dict)
+    result = InsertSqlCreator()._split_columns(parameter_names, value_dict)
     expected = {'title': 'Pride and Prejudice', 'name': 'Jane Austen', 'year': 1813}
     assert result == expected
 
@@ -228,7 +230,7 @@ def test_split_value():
     parameter_name = ('name', 'year')
     value = 'Jane Austen:1813'
 
-    result = SqlCreator()._split_value(parameter_name, value)
+    result = InsertSqlCreator()._split_value(parameter_name, value)
     expected = {'name': 'Jane Austen', 'year': 1813}
     assert result == expected
 
@@ -238,7 +240,7 @@ def test_split_value_single():
     parameter_name = ('year',)
     value = 1813
 
-    result = SqlCreator()._split_value(parameter_name, value)
+    result = InsertSqlCreator()._split_value(parameter_name, value)
     expected = {'year': 1813}
     assert result == expected
 
@@ -248,23 +250,23 @@ def test_split_value_json():
     parameter_name = ('year', 'json')
     value = '1813:{"key 1": "value 1"}'
 
-    result = SqlCreator()._split_value(parameter_name, value)
+    result = InsertSqlCreator()._split_value(parameter_name, value)
     expected = {'year': 1813, 'json': {"key 1": "value 1"}}
     assert result == expected
 
 
 def test_clean_values_in_dict():
     # test that it removes leading and trailing whitespace
-    assert SqlCreator()._clean_values_in_dict({'name': '  Jane Austen  '}) == {'name': 'Jane Austen'}
+    assert InsertSqlCreator()._clean_values_in_dict({'name': '  Jane Austen  '}) == {'name': 'Jane Austen'}
     # test that it converts int64 to int
-    assert SqlCreator()._clean_values_in_dict({'year': int64(1813)}) == {'year': 1813}
+    assert InsertSqlCreator()._clean_values_in_dict({'year': int64(1813)}) == {'year': 1813}
     # test that it converts a np.float64 into a Float
-    price = SqlCreator()._clean_values_in_dict({'price': numpy.float64(12.34)})
+    price = InsertSqlCreator()._clean_values_in_dict({'price': numpy.float64(12.34)})
     assert type(price['price']) == float
     # test that it converts multiple values at once
-    assert SqlCreator()._clean_values_in_dict({'name': '  Jane Austen  ', 'year': int64(1813)}) == {'name': 'Jane Austen', 'year': 1813}
+    assert InsertSqlCreator()._clean_values_in_dict({'name': '  Jane Austen  ', 'year': int64(1813)}) == {'name': 'Jane Austen', 'year': 1813}
     # test that it converts numpy bool to python bool
-    result = SqlCreator()._clean_values_in_dict({'execute': numpy.True_})['execute']
+    result = InsertSqlCreator()._clean_values_in_dict({'execute': numpy.True_})['execute']
     # check that result is of type string, bec/ that's how psycopg represents booleans
     assert type(result) == str
 

@@ -1,11 +1,11 @@
 import pandas as pd
 
 from stimula.header.csv_header_parser import HeaderParser
-from stimula.service.diff_to_sql import DiffToSql
+from stimula.service.diff_to_executor import DiffToExecutor
 
 
 # test diff_sql method
-def test_diff_sql(books, meta, lexer):
+def test_diff_executor(books, meta, lexer):
     header = 'title[unique=true], authorid(name)'
     mapping = HeaderParser(meta, 'books').parse_csv(header)
 
@@ -23,7 +23,7 @@ def test_diff_sql(books, meta, lexer):
         columns=['title[unique=true]', 'authorid(name)'])
 
     # get queries
-    insert, update, delete = DiffToSql().diff_sql(mapping, (inserts, updates, deletes))
+    insert, update, delete = DiffToExecutor().diff_executor(mapping, (inserts, updates, deletes))
 
     expected_insert = ('insert into books(title, authorid) select :title, authors.author_id from authors where authors.name = :name', {'name': 'Jane Austen', 'title': 'Pride and Prejudice'})
     expected_update = ('update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', {'name': 'Joseph Heller', 'title': 'Pride and Prejudice'})
