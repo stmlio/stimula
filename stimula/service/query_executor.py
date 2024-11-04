@@ -191,8 +191,11 @@ class ExecutionResult:
     def __str__(self):
         return f"Type: {self.operation_type}, Success: {self.success}, Rowcount: {self.rowcount}, Table: {self.table_name}, Query: {self.query}, Params: {self.params}"
 
-    def report(instance, execute):
+    def report(self, execute):
+        # pandas stores empty input values as nan. Replace NaN values with empty strings.
+        self.params = {k: '' if pd.isna(v) else v for k, v in self.params.items()}
+
         if execute:
-            return [{key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'dependent_execution_result']}]
+            return [{key: value for key, value in vars(self).items() if value is not None and key not in ['block_commit', 'dependent_execution_result']}]
         else:
-            return [{key: value for key, value in vars(instance).items() if value is not None and key not in ['block_commit', 'success', 'rowcount', 'dependent_execution_result']}]
+            return [{key: value for key, value in vars(self).items() if value is not None and key not in ['block_commit', 'success', 'rowcount', 'dependent_execution_result']}]
