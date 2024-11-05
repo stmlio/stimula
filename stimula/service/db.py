@@ -23,6 +23,7 @@ from .context import cnx_context, get_metadata
 from .csv_reader import CsvReader
 from .db_reader import DbReader
 from .diff_to_executor import DiffToExecutor
+from .odoo.postgres_model_service import PostgresModelService
 from .query_executor import OperationType
 from .reporter import Reporter
 from ..compiler.model_compiler import ModelCompiler
@@ -115,7 +116,7 @@ class DB:
 
         else:
             # parse header to build syntax tree
-            mapping = ModelCompiler(metadata).compile(StmlParser().parse_csv(table_name, header))
+            mapping = ModelCompiler(PostgresModelService(metadata)).compile(StmlParser().parse_csv(table_name, header))
 
         df = DbReader().read_from_db(mapping, where_clause)
 
@@ -263,7 +264,7 @@ class DB:
         assert header, "Header is required, either as a parameter or as the first line in the body with skiprows set to 1"
 
         # parse header to build syntax tree
-        mapping = ModelCompiler(get_metadata(cnx)).compile(StmlParser().parse_csv(table_name, header))
+        mapping = ModelCompiler(PostgresModelService(get_metadata(cnx))).compile(StmlParser().parse_csv(table_name, header))
 
         # read dataframe from request first, so we can give feedback on errors in the request
         df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script)

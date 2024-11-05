@@ -5,12 +5,12 @@ from stimula.service.db_reader import DbReader
 db_reader = DbReader()
 
 
-def test_get_select_statement(books, db, meta):
+def test_get_select_statement(books, db, model_compiler):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
 
     # parse header to build mapping
-    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
 
     query = db_reader._create_select_query(mapping, None)
 

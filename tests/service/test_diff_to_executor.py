@@ -6,10 +6,10 @@ from stimula.service.diff_to_executor import DiffToExecutor
 
 
 # test diff_sql method
-def test_diff_executor(books, meta):
+def test_diff_executor(books, model_compiler):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
 
     inserts = pd.DataFrame([
         ['Pride and Prejudice', 0, 'Jane Austen'],

@@ -1,6 +1,8 @@
 import sys
 
+from stimula.compiler.model_compiler import ModelCompiler
 from stimula.service.abstract_orm import AbstractORM
+from stimula.service.odoo.postgres_model_service import PostgresModelService
 
 print('sys.path')
 print(sys.path)
@@ -89,6 +91,11 @@ def meta(cnx):
     metadata.reflect(bind=engine)
 
     return metadata
+
+
+@pytest.fixture
+def model_compiler(meta):
+    return ModelCompiler(PostgresModelService(meta))
 
 
 @pytest.fixture

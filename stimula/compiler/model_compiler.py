@@ -8,23 +8,23 @@ Author: Romke Jonker
 Email: romke@rnadesign.net
 
 """
-import csv
-import io
+
+from stimula.service.model_service import ModelService
 
 
-class ModelCompiler():
+class ModelCompiler:
     # CSV headers that are treated as boolean
     BOOLEAN_HEADERS = ['unique', 'skip']
 
-    def __init__(self, metadata):
-        self.metadata = metadata
+    def __init__(self, model_service: ModelService):
+        self._model_service: ModelService = model_service
 
     def compile(self, mapping):
         # resolve table
-        table = self._resolve_table(mapping['table'])
+        table = self._model_service.find_table(mapping['table'])
 
         # find primary key, required for ORM operations
-        primary_keys = self.find_primary_keys(table)
+        primary_keys = self._model_service.find_primary_keys(table)
 
         if len(primary_keys):
             mapping['primary-key'] = primary_keys[0]
@@ -64,18 +64,17 @@ class ModelCompiler():
         if 'foreign-key' in attribute:
             self._foreign_key(table, attribute, modifiers)
 
-
     def _foreign_key(self, table, attribute, modifiers):
         # get foreign key object
         foreign_key = attribute['foreign-key']
 
         # resolve foriegn key table and column
-        target_table, target_column = self._resolve_foreign_key_table(table, attribute['name'])
+        target_table, target_column_name = self._model_service._resolve_foreign_key_table(table, attribute['name'])
 
         # if table found, set foreign key table and column
         if not target_table is None:
             foreign_key['table'] = target_table.name
-            foreign_key['name'] = target_column
+            foreign_key['name'] = target_column_name
 
             # recurse attributes
             [self._attribute(target_table, a, modifiers) for a in foreign_key.get('attributes', [])]
@@ -90,7 +89,7 @@ class ModelCompiler():
         # find foreign table name in modifiers, or default to Odoo's ir_model_data table
         table_name = modifiers.get('table', 'ir_model_data')
         # resolve the table
-        table = self._resolve_table(table_name)
+        table = self._model_service.find_table(table_name)
         # remove the attribute because we don't need it as a modifier
         if 'table' in modifiers:
             del modifiers['table']
@@ -129,44 +128,3 @@ class ModelCompiler():
                 raise ValueError(f"Column '{a['name']}' not found in table '{table}'")
             column_type = str(table.columns[a['name']].type).lower()
             a['type'] = column_type
-
-    def _resolve_table(self, table_name):
-        table = self.metadata.tables.get(table_name)
-        if table is None:
-            raise ValueError(f"Table '{table_name}' not found")
-        return table
-
-    def find_primary_keys(self, table):
-        # return names of primary keys in table
-        return [column.name for column in table.primary_key]
-
-    def error(self, token):
-        msg = 'Parse error'
-        if token:
-            # if token has value attribute
-            value = getattr(token, 'value', None)
-            if value:
-                msg += f': encountered \'{value}\''
-
-            # if token has index attribute
-            index = getattr(token, 'index', 0)
-            if index:
-                msg += f' at index {index}'
-
-        # fail fast
-        raise ValueError(msg)
-
-    def _resolve_foreign_key_table(self, table, column_name):
-        # get referred column
-        if column_name not in table.columns:
-            raise ValueError(f"Column '{column_name}' not found in table '{table.name}'")
-        column = table.columns[column_name]
-        # only know how to deal with a single foreign key per column
-        if len(column.foreign_keys) != 1:
-            # this is either an error condition or an extension relation, with the foreign key in the extension table. We can tell once we have parsed the modifiers.
-            return None, column_name
-
-        foreign_key = list(column.foreign_keys)[0]
-        table = foreign_key.column.table
-        column = foreign_key.column.name
-        return table, column

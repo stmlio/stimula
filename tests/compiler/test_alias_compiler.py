@@ -3,38 +3,38 @@ from stimula.compiler.model_compiler import ModelCompiler
 from stimula.header.stml_parser import StmlParser
 
 
-def test_columns(books, meta):
+def test_columns(books, model_compiler):
     table = 'books'
     header = 'title, price'
-    result = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table, header)))
+    result = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table, header)))
     expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'parameter': 'title', 'type': 'text'}], 'enabled': True},
         {'attributes': [{'name': 'price', 'parameter': 'price', 'type': 'numeric'}], 'enabled': True}]}
     assert result == expected
 
-def test_modifiers(books, meta):
+def test_modifiers(books, model_compiler):
     table = 'books'
     header = 'title[unique=true], price[x=1: y=2]'
-    result = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table, header)))
+    result = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table, header)))
     expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'parameter': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
         {'attributes': [{'name': 'price', 'parameter': 'price', 'type': 'numeric'}], 'x': '1', 'y': '2', 'enabled': True}
     ]}
     assert result == expected
 
-def test_multiple_attributes(books, meta):
+def test_multiple_attributes(books, model_compiler):
     table = 'books'
     header = 'bookid:title[unique=true], price'
-    result = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table, header)))
+    result = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table, header)))
     expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'bookid', 'parameter': 'bookid', 'type': 'integer'}, {'name': 'title', 'parameter': 'title', 'type': 'text'}], 'unique': True, 'enabled': True},
         {'attributes': [{'name': 'price', 'parameter': 'price', 'type': 'numeric'}], 'enabled': True}]}
     assert result == expected
 
-def test_foreign_key(books, meta):
+def test_foreign_key(books, model_compiler):
     table = 'books'
     header = 'authorid(name:publisherid(publishername:country):birthyear)'
-    result = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table, header)))
+    result = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table, header)))
     expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [
             {'name': 'authorid', 'type': 'integer', 'foreign-key': {'table': 'authors', 'alias': 'authors', 'name': 'author_id', 'attributes': [
@@ -50,10 +50,10 @@ def test_foreign_key(books, meta):
 
     assert result == expected
 
-def test_alias(books, meta):
+def test_alias(books, model_compiler):
     table = 'books'
     header = 'title[unique=true], seriesid(title)'
-    result = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table, header)))
+    result = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table, header)))
     expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [{'name': 'title', 'parameter': 'title', 'type': 'text'}], 'enabled': True, 'unique': True},
         {'attributes': [

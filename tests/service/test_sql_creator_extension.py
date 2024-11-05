@@ -15,11 +15,11 @@ This script tests generating queries for inserts, updates, and deletes for the i
 '''
 
 
-def test_insert_sql_creator_external_id(books, meta):
+def test_insert_sql_creator_external_id(books, model_compiler):
     # test that we can insert a record into an extension table
     table_name = 'books'
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [0, 'Pride and Prejudice', '12345'],
@@ -37,11 +37,11 @@ def test_insert_sql_creator_external_id(books, meta):
     assert actual == expected
 
 
-def test_insert_sql_creator_external_id_unique(books, meta, ir_model_data):
+def test_insert_sql_creator_external_id_unique(books, model_compiler, ir_model_data):
     # test that we can detect a required insert based on unique external id
     table_name = 'books'
     header = 'title, bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books: unique=true]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
 
     # 'Emma' exists, but with external id '11111'
     diff = pd.DataFrame([
@@ -60,11 +60,11 @@ def test_insert_sql_creator_external_id_unique(books, meta, ir_model_data):
     assert actual == expected
 
 
-def test_update_sql_creator_unmodified_external_id(books, meta):
+def test_update_sql_creator_unmodified_external_id(books, model_compiler):
     # test we can update a record, even if there's an external id that is not marked as unique and was not modified
     table_name = 'books'
     header = 'title[unique=true], authorid(name), bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'],
@@ -80,11 +80,11 @@ def test_update_sql_creator_unmodified_external_id(books, meta):
     assert actual == expected
 
 
-def test_update_sql_creator_unique_external_id(books, meta):
+def test_update_sql_creator_unique_external_id(books, model_compiler):
     # test we can update a record, identified by external id
     table_name = 'books'
     header = 'title, authorid(name), bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books: unique=true]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen', '11111'],
@@ -102,11 +102,11 @@ def test_update_sql_creator_unique_external_id(books, meta):
     assert actual == expected
 
 
-def test_delete_sql_creator_external_id(books, meta):
+def test_delete_sql_creator_external_id(books, model_compiler):
     # test that we can insert a record into an extension table
     table_name = 'books'
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [0, 'Pride and Prejudice', '12345'],

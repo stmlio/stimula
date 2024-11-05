@@ -17,7 +17,8 @@ def test_auth():
 # make stimula believe it's in TTY mode, even though it's started from test runner
 @patch('sys.stdin.isatty', return_value=True)
 def test_post_single_file(mock_isatty):
-    call_main(f'stimula post -k {STIMULA_KEY} -t res_partner -f csv/res_partner.csv -e IUE')
+    call_main(f'stimula post -k {STIMULA_KEY} -t res_partner -f csv/res_partner.csv -IUC')
+
 
 @patch('sys.stdin.isatty', return_value=True)
 def test_post_attachment(mock_isatty):
@@ -58,7 +59,7 @@ def test_anonymize():
 
     # skip test if filename does not exist
     if not glob.glob(filename):
-        print (f"Skipping test_anonymize because {filename} does not exist")
+        print(f"Skipping test_anonymize because {filename} does not exist")
     with open(filename, 'r') as f:
         with patch('sys.stdin', f):
             call_main(f'stimula anonymize -V')

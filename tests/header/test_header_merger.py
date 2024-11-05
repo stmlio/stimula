@@ -4,12 +4,12 @@ from stimula.header.odoo_header_parser import OdooHeaderParser
 from stimula.header.stml_parser import StmlParser
 
 
-def test_merge(books, meta, cr):
+def test_merge(books, meta, model_compiler, cr):
     table_name = 'books'
     default_mapping = OdooHeaderParser(meta, cr).parse('books')
 
     header = 'title[unique=true], authorid(name:birthyear)'
-    requested_mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
+    requested_mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 
@@ -30,12 +30,12 @@ def test_merge(books, meta, cr):
     assert merged_mapping == expected
 
 
-def test_merge_empty_column_in_requested_header(books, meta, cr):
+def test_merge_empty_column_in_requested_header(books, meta, model_compiler, cr):
     table_name = 'books'
     default_mapping = OdooHeaderParser(meta, cr).parse('books')
 
     header = 'title[unique=true],'
-    requested_mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
+    requested_mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 
@@ -55,13 +55,13 @@ def test_merge_empty_column_in_requested_header(books, meta, cr):
     assert merged_mapping == expected
 
 
-def test_merge_primary_key_as_unique_column(books, meta, cr):
+def test_merge_primary_key_as_unique_column(books, meta, model_compiler, cr):
     # test that if a primary key is the only unique column, then the merge maintains the primary-key attribute
     table_name = 'properties'
     default_mapping = OdooHeaderParser(meta, cr).parse(table_name)
 
     header = 'property_id[unique=true], name'
-    requested_mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
+    requested_mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 

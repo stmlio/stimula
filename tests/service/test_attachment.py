@@ -17,12 +17,12 @@ from stimula.service.csv_reader import CsvReader
 from stimula.service.db_reader import DbReader
 
 
-def test_compile_header(meta, ir_attachment):
+def test_compile_header(model_compiler, ir_attachment):
     table_name = 'ir_attachment'
     header = 'res_id(bookid)[table=books: name=title: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], checksum[api=rest: host=$afas: url="/fileconnector/{guid}/{name}": unique=true]'
 
     # compile header
-    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
 
     expected = {'table': 'ir_attachment', 'primary-key': 'id', 'columns': [
         {'attributes': [
@@ -37,10 +37,10 @@ def test_compile_header(meta, ir_attachment):
     assert mapping == expected
 
 
-def test_create_select_query(meta, ir_attachment):
+def test_create_select_query(model_compiler, ir_attachment):
     table_name = 'ir_attachment'
     header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="checksum(file)": unique=true]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
     result = SelectCompiler().compile(mapping)
     expected = 'select books.title, ir_attachment.name, ir_attachment.res_model, ir_attachment.checksum ' \
                'from ir_attachment left join books on ir_attachment.res_id = books.bookid ' \
@@ -48,10 +48,10 @@ def test_create_select_query(meta, ir_attachment):
     assert result == expected
 
 
-def test_run_select_query(meta, ir_attachment):
+def test_run_select_query(model_compiler, ir_attachment):
     table_name = 'ir_attachment'
     header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
     df = DbReader().read_from_db(mapping, None)
     assert df.shape == (1, 4)
     assert df.columns.tolist() == ['res_id(title)[unique=true]', 'name', 'res_model[default-value=account.move: unique=true]', 'checksum[exp=@checksum(file): unique=true]']
@@ -72,10 +72,10 @@ def test_file_connector_api():
     assert response.headers['Content-Disposition'] == 'attachment; filename=attachment.pdf'
 
 
-def test_read_csv_and_get_from_api(meta):
+def test_read_csv_and_get_from_api(model_compiler):
     table_name = 'ir_attachment'
     header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true]'
-    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
 
     csv = 'Emma, abcdef, attachment 123.pdf, books, '
 
