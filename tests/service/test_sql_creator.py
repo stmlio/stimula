@@ -4,16 +4,16 @@ import pytest
 from numpy import int64, nan
 
 from stimula.compiler.alias_compiler import AliasCompiler
-from stimula.header.csv_header_parser import HeaderParser
-from stimula.service.executor_creator import ExecutorCreator
+from stimula.compiler.model_compiler import ModelCompiler
+from stimula.header.stml_parser import StmlParser
 from stimula.service.query_executor import OperationType
 from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
 
 
-def test_create_sql(meta, books, lexer):
-    table = 'books'
+def test_create_sql(meta, books):
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     inserts = pd.DataFrame([
         ['Pride and Prejudice', 0, 'Jane Austen'],
     ],
@@ -26,11 +26,11 @@ def test_create_sql(meta, books, lexer):
     assert result[0].query, result[0].params == expected
 
 
-def test_create_sql_multiple_update_rows(meta, books, lexer):
+def test_create_sql_multiple_update_rows(meta, books):
     # verify that it can create multiple rows with different columns
-    table = 'books'
+    table_name = 'books'
     header = 'title[unique=true], authorid(name), description'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # create multi index series with self/other columns
     columns = ['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other'), ('description', 'self'), ('description', 'other')]
 
@@ -49,11 +49,11 @@ def test_create_sql_multiple_update_rows(meta, books, lexer):
     assert [(u.query, u.params) for u in updates] == expected
 
 
-def test_create_sql_row_insert(meta, books, lexer):
+def test_create_sql_row_insert(meta, books):
     # test that it creates an insert sql query and a value dict
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # create series with column names
     row = pd.Series([0, 'Pride and Prejudice', 'Jane Austen'], index=['__line__', 'title[unique=true]', 'authorid(name)'])
 
@@ -63,10 +63,10 @@ def test_create_sql_row_insert(meta, books, lexer):
     assert executor.query, executor.params == expected
 
 
-def test_create_sql_row_insert_skip_empty_column(books, meta, lexer):
+def test_create_sql_row_insert_skip_empty_column(books, meta):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     row = pd.Series([0, 'Pride and Prejudice', ''], index=['__line__', 'title[unique=true]', 'authorid(name)'])
     executor = InsertSqlCreator()._prepare_and_create_executor(mapping, row, 1)
 
@@ -75,10 +75,10 @@ def test_create_sql_row_insert_skip_empty_column(books, meta, lexer):
     assert executor.query, executor.params == expected
 
 
-def test_create_sql_row_insert_skip_nan(books, meta, lexer):
+def test_create_sql_row_insert_skip_nan(books, meta):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     row = pd.Series([0, 'Pride and Prejudice', nan], index=['__line__', 'title[unique=true]', 'authorid(name)'])
     executor = InsertSqlCreator()._prepare_and_create_executor(mapping, row, 1)
 
@@ -86,20 +86,21 @@ def test_create_sql_row_insert_skip_nan(books, meta, lexer):
 
     assert executor.query, executor.params == expected
 
-def test_create_sql_row_insert_empty_row_must_fail(books, meta, lexer):
+
+def test_create_sql_row_insert_empty_row_must_fail(books, meta):
     table_name = 'books'
     header = 'title, authorid(name)'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     row = pd.Series([0, nan, nan], index=['__line__', 'title', 'authorid(name)'])
 
     with pytest.raises(AssertionError):
         InsertSqlCreator()._prepare_mapping_and_values(mapping, row)
 
 
-def test_create_sql_row_update(books, meta, lexer):
+def test_create_sql_row_update(books, meta):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # test that it creates an update sql query and a value dict
     row = pd.Series([(0,), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'], index=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
     executor = UpdateSqlCreator()._prepare_and_create_executor(mapping, row, 1)
@@ -110,21 +111,21 @@ def test_create_sql_row_update(books, meta, lexer):
     assert executor.query, executor.params == expected
 
 
-def test_create_sql_row_update_no_changes(books, meta, lexer):
+def test_create_sql_row_update_no_changes(books, meta):
     with pytest.raises(AssertionError):
         # test that it raises an exception if no non-unique attributes were updated
+        table_name = 'books'
         header = 'title[unique=true], authorid(name)'
-        mapping = HeaderParser(meta, 'books').parse_csv(header)
-        AliasCompiler().compile(mapping)
+        mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
         row = pd.Series(['Pride and Prejudice', 'Jane Austen', 'Jane Austen'], index=[('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
         UpdateSqlCreator()._prepare_mapping_and_values(mapping, row)
 
 
-def test_create_sql_row_delete(books, meta, lexer):
+def test_create_sql_row_delete(books, meta):
     table_name = 'books'
     # test that it creates a delete sql query and a value dict
     header = 'title[unique=true], authorid(name)'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # create series with column names
     row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
 
@@ -135,10 +136,10 @@ def test_create_sql_row_delete(books, meta, lexer):
     assert executor.query, executor.params == expected
 
 
-def test_delete_sql_split_columns(books, meta, lexer):
+def test_delete_sql_split_columns(books, meta):
     table_name = 'books'
     header = 'title:authorid[unique=true], description'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table_name).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     row = pd.Series(['Pride and Prejudice:1'], index=['title:authorid[unique=true]'])
     executor = DeleteSqlCreator()._prepare_and_create_executor(mapping, row, 1)
 
@@ -147,11 +148,11 @@ def test_delete_sql_split_columns(books, meta, lexer):
     assert executor.query, executor.params == expected
 
 
-def test_create_unique_value_dict(books, meta, lexer):
+def test_create_unique_value_dict(books, meta):
     # test that unique headers are used as keys
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
-    AliasCompiler().compile(mapping)
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # create series with column names
     row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
 
@@ -160,11 +161,11 @@ def test_create_unique_value_dict(books, meta, lexer):
     assert result == expected
 
 
-def test_create_non_unique_value_dict(books, meta, lexer):
+def test_create_non_unique_value_dict(books, meta):
     # test that non-unique headers are used as keys in the key-value map
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
-    AliasCompiler().compile(mapping)
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # create series with column names
     row = pd.Series(['Pride and Prejudice', 'Jane Austen'], index=['title[unique=true]', 'authorid(name)'])
 
@@ -173,11 +174,11 @@ def test_create_non_unique_value_dict(books, meta, lexer):
     assert result == expected
 
 
-def test_create_non_unique_value_dict_for_insert(books, meta, lexer):
+def test_create_non_unique_value_dict_for_insert(books, meta):
     # test that empty values are ignored in the key-value map
+    table_name = 'books'
     header = 'title[unique=true], price'
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
-    AliasCompiler().compile(mapping)
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # create series with column names
     row = pd.Series(['Pride and Prejudice', nan, None], index=['title[unique=true]', 'year', 'price'])
 
@@ -186,26 +187,27 @@ def test_create_non_unique_value_dict_for_insert(books, meta, lexer):
     assert result == expected
 
 
-def test_filter_mapping(books, meta, lexer):
+def test_filter_mapping(books, meta):
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     # create value dict
     value_dict = {'authorid(name)': 'Jane Austen'}
 
     result = InsertSqlCreator()._filter_mapping(mapping, value_dict)
     expected = {'table': 'books', 'primary-key': 'bookid', 'columns': [
         {'attributes': [
-            {'name': 'authorid', 'foreign-key': {'attributes': [{'name': 'name', 'type': 'text'}], 'name': 'author_id', 'table': 'authors'}}
+            {'name': 'authorid', 'type': 'integer', 'foreign-key': {'attributes': [{'name': 'name', 'type': 'text'}], 'name': 'author_id', 'table': 'authors'}}
         ], 'enabled': True}
     ]}
     assert result == expected
 
 
-def test_map_parameter_names_with_values(books, meta, lexer):
+def test_map_parameter_names_with_values(books, meta):
     # test that non-unique headers are used as keys
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
-    AliasCompiler().compile(mapping)
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
     # create series with column names
     parameter_names = [('title',), ('name',)]
     value_dict = {'title[unique=true]': 'Pride and Prejudice', 'authorid(name)': 'Jane Austen'}

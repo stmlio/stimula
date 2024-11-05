@@ -15,7 +15,6 @@ from pandas import DataFrame
 from stimula.compiler.header_compiler import HeaderCompiler
 from stimula.compiler.select_compiler import SelectCompiler
 from stimula.compiler.types_compiler import TypesCompiler
-from stimula.header.csv_header_parser import HeaderParser
 from stimula.header.header_lexer import HeaderLexer
 from stimula.header.header_merger import HeaderMerger
 from stimula.header.odoo_header_parser import OdooHeaderParser
@@ -26,6 +25,8 @@ from .db_reader import DbReader
 from .diff_to_executor import DiffToExecutor
 from .query_executor import OperationType
 from .reporter import Reporter
+from ..compiler.model_compiler import ModelCompiler
+from ..header.stml_parser import StmlParser
 
 _logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class DB:
 
         else:
             # parse header to build syntax tree
-            mapping = HeaderParser(metadata, table_name).parse_csv(header)
+            mapping = ModelCompiler(metadata).compile(StmlParser().parse_csv(table_name, header))
 
         query = SelectCompiler().compile_count_query(mapping, where_clause)
 
@@ -114,7 +115,7 @@ class DB:
 
         else:
             # parse header to build syntax tree
-            mapping = HeaderParser(metadata, table_name).parse_csv(header)
+            mapping = ModelCompiler(metadata).compile(StmlParser().parse_csv(table_name, header))
 
         df = DbReader().read_from_db(mapping, where_clause)
 
@@ -262,7 +263,7 @@ class DB:
         assert header, "Header is required, either as a parameter or as the first line in the body with skiprows set to 1"
 
         # parse header to build syntax tree
-        mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
+        mapping = ModelCompiler(get_metadata(cnx)).compile(StmlParser().parse_csv(table_name, header))
 
         # read dataframe from request first, so we can give feedback on errors in the request
         df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script)
@@ -370,7 +371,7 @@ class DB:
             return mapping
 
         # parse header to build syntax tree
-        parsed_header = HeaderParser(metadata, table_name).parse_csv(header)
+        parsed_header = ModelCompiler(metadata).compile(StmlParser().parse_csv(table_name, header))
 
         # merge headers
         merged_mapping = HeaderMerger().merge(mapping, parsed_header)
@@ -478,7 +479,7 @@ class DB:
         cnx = cnx_context.cnx
 
         # parse header to build syntax tree
-        mapping = HeaderParser(get_metadata(cnx), table_name).parse_csv(header)
+        mapping = ModelCompiler(get_metadata(cnx)).compile(StmlParser().parse_csv(table_name, header))
 
         # reconstruct original header from tree
         column_keys = HeaderCompiler().compile_list(mapping)

@@ -2,9 +2,6 @@
 This script tests scenarios involving an extension table, such as the ir_model_data table that stores external ids for Odoo models.
 '''
 import pandas as pd
-import pytest
-
-from stimula.header.csv_header_parser import HeaderParser
 
 
 def test_insert_extension(db, books, ir_model_data):

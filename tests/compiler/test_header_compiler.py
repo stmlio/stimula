@@ -1,11 +1,12 @@
-from stimula.compiler.alias_compiler import AliasCompiler
 from stimula.compiler.header_compiler import HeaderCompiler
-from stimula.header.csv_header_parser import HeaderParser
+from stimula.compiler.model_compiler import ModelCompiler
+from stimula.header.stml_parser import StmlParser
 
 
-def test_empty(meta, lexer):
+def test_empty(meta):
+    table_name = 'books'
     header = ''
-    mapping = HeaderParser(meta, 'books').parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -13,10 +14,10 @@ def test_empty(meta, lexer):
     assert json == expected
 
 
-def test_columns(books, lexer, meta):
-    table = 'books'
+def test_columns(books, meta):
+    table_name = 'books'
     header = 'title, price'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -24,10 +25,10 @@ def test_columns(books, lexer, meta):
     assert json == expected
 
 
-def test_modifiers(books, lexer, meta):
-    table = 'books'
+def test_modifiers(books, meta):
+    table_name = 'books'
     header = 'title[unique=true], price[x=1: y=2]'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -38,18 +39,18 @@ def test_modifiers(books, lexer, meta):
     assert json == expected
 
 
-def test_modifier_with_quoted_value(books, lexer, meta):
-    table = 'books'
+def test_modifier_with_quoted_value(books, meta):
+    table_name = 'books'
     header = 'title[unique=true], price[filter="$ = \'abc\'"]'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
 
 
-def test_multiple_attributes(books, lexer, meta):
-    table = 'books'
+def test_multiple_attributes(books, meta):
+    table_name = 'books'
     header = 'bookid:title[unique=true], price'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -59,10 +60,10 @@ def test_multiple_attributes(books, lexer, meta):
     assert json == expected
 
 
-def test_foreign_key(books, lexer, meta):
-    table = 'books'
+def test_foreign_key(books, meta):
+    table_name = 'books'
     header = 'authorid(name:publisherid(publishername:country):birthyear)'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     csv = HeaderCompiler().compile_csv(mapping)
     assert csv == header
     json = HeaderCompiler().compile_json(mapping)
@@ -72,7 +73,7 @@ def test_foreign_key(books, lexer, meta):
     assert json == expected
 
 
-def test_type(books, lexer, meta):
+def test_type(books, meta):
     mapping = {'table': 'authors', 'columns': [
         {'attributes': [{'name': 'authorid', 'type': 'integer'}], 'primary-key': True, 'in-use': True},
         {'attributes': [{'name': 'name', 'type': 'text'}], 'unique': True, 'in-use': True, 'default': True},
@@ -92,41 +93,41 @@ def test_type(books, lexer, meta):
     assert json == expected
 
 
-def test_list(books, lexer, meta):
-    table = 'books'
+def test_list(books, meta):
+    table_name = 'books'
     header = 'title, price'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     list = HeaderCompiler().compile_list(mapping)
     assert list == ['title', 'price']
 
 
-def test_unique_columns(books, lexer, meta):
-    table = 'books'
+def test_unique_columns(books, meta):
+    table_name = 'books'
     header = ' bookid: title [unique =true], price  '
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     csv = HeaderCompiler().compile_csv_unique(mapping)
     assert csv == 'bookid:title[unique=true]'
 
 
-def test_unique_list(books, lexer, meta):
-    table = 'books'
+def test_unique_list(books, meta):
+    table_name = 'books'
     header = ' bookid: title [unique =true], price  '
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     list = HeaderCompiler().compile_list_unique(mapping)
     assert list == ['bookid:title[unique=true]']
 
 
-def test_non_unique_list(books, lexer, meta):
-    table = 'books'
+def test_non_unique_list(books, meta):
+    table_name = 'books'
     header = ' bookid: title [unique =true], price  '
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     list = HeaderCompiler().compile_list_non_unique(mapping)
     assert list == ['price']
 
 
-def test_list_with_skip(books, lexer, meta):
-    table = 'books'
+def test_list_with_skip(books, meta):
+    table_name = 'books'
     header = ' title [unique =true], price, xyz[skip=true]  '
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     list = HeaderCompiler().compile_list(mapping)
     assert list == ['title[unique=true]', 'price']

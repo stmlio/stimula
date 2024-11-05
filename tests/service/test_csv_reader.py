@@ -4,14 +4,15 @@ import re
 import pandas as pd
 import pytest
 
-from stimula.header.csv_header_parser import HeaderParser
+from stimula.compiler.model_compiler import ModelCompiler
+from stimula.header.stml_parser import StmlParser
 from stimula.service.csv_reader import CsvReader
 
 csv_reader = CsvReader()
 def test_read_from_request(db, books, meta):
-    table = 'books'
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     body = '''
         Emma, Jane Austen
         War and Peace, Leo Tolstoy
@@ -42,9 +43,9 @@ def test_read_from_request(db, books, meta):
 
 def test_read_from_request_trailing_space(db, books, meta):
     # test that trailing spaces are removed from the input
-    table = 'books'
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     body = '''
         Emma , Jane Austen 
     '''
@@ -62,9 +63,9 @@ def test_read_from_request_trailing_space(db, books, meta):
 
 def test_read_from_request_detect_duplicate(db, books, meta):
     # verify that duplicates in the input halts the import
-    table = 'books'
+    table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     body = '''
         Emma, Jane Austen
         War and Peace, Leo Tolstoy

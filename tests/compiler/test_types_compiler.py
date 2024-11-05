@@ -1,12 +1,14 @@
+from stimula.compiler.model_compiler import ModelCompiler
 from stimula.compiler.types_compiler import TypesCompiler, json_to_dict, memoryview_to_string_converter
-from stimula.header.csv_header_parser import HeaderParser
+
+from stimula.header.stml_parser import StmlParser
 
 
-def test_columns(books, lexer, meta):
+def test_columns(books, meta):
     # verify that compiler returns a converter to read json string as dict
-    table = 'properties'
+    table_name = 'properties'
     header = 'name, jsonb'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     types = TypesCompiler().compile(mapping, header.split(', '))
     converter = types['read_csv_converters']['jsonb']
     # check converter exists
@@ -45,11 +47,11 @@ def test_json_with_html():
     assert json == expected
 
 
-def test_dtypes(books, lexer, meta):
+def test_dtypes(books, meta):
     # verify that compiler returns a converter to read json string as dict
-    table = 'properties'
+    table_name = 'properties'
     header = 'property_id, name, value, number, float, decimal, timestamp, date, jsonb'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
     types = TypesCompiler().compile(mapping, header.split(', '))
     dtypes = types['read_csv_dtypes']
     expected = {'date': 'object',

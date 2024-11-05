@@ -13,7 +13,6 @@ from sqlalchemy import (create_engine, MetaData)
 from stimula.service.auth import Auth
 from stimula.service.db import DB, cnx_context
 from stimula.header.header_lexer import HeaderLexer
-from stimula.header.csv_header_parser import HeaderParser
 
 
 class TestAuth(Auth):
@@ -27,6 +26,7 @@ class TestAuth(Auth):
         # return cnx, cr for caller to unpack
         return None, None
 
+
 class TestORM(AbstractORM):
     def create(self, model_name: str, values: dict):
         pass
@@ -39,6 +39,7 @@ class TestORM(AbstractORM):
 
     def delete(self, model_name: str, record_id: int):
         pass
+
 
 @pytest.fixture
 def db_params():
@@ -202,16 +203,6 @@ def ir_attachment(cnx):
 
 
 @pytest.fixture
-def lexer():
-    return HeaderLexer()
-
-
-@pytest.fixture
-def parser():
-    return HeaderParser()
-
-
-@pytest.fixture
 def cnx(db_params):
     # connect to database
     cnx = psycopg2.connect(**db_params)
@@ -251,6 +242,7 @@ def test_table(cnx):
             cursor.execute("DROP TABLE IF EXISTS test")
             # execute create table statement
             cursor.execute("CREATE TABLE test (id integer)")
+
 
 @pytest.fixture
 def orm():

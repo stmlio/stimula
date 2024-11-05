@@ -1,21 +1,22 @@
-from stimula.header.csv_header_parser import HeaderParser
+from stimula.compiler.model_compiler import ModelCompiler
 from stimula.header.header_merger import HeaderMerger
 from stimula.header.odoo_header_parser import OdooHeaderParser
+from stimula.header.stml_parser import StmlParser
 
 
-def test_merge(books, meta, cr, lexer):
-    table = 'books'
+def test_merge(books, meta, cr):
+    table_name = 'books'
     default_mapping = OdooHeaderParser(meta, cr).parse('books')
 
     header = 'title[unique=true], authorid(name:birthyear)'
-    requested_mapping = HeaderParser(meta, table).parse_csv(header)
+    requested_mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 
     expected = {'table': 'books', 'columns': [
         {'attributes': [{'name': 'bookid', 'type': 'integer'}], 'in-use': True, 'primary-key': True},
         {'attributes': [{'name': 'title', 'type': 'text'}], 'in-use': True, 'unique': True, 'enabled': True},
-        {'attributes': [{'name': 'authorid', 'foreign-key': {'table': 'authors', 'name': 'author_id', 'attributes': [
+        {'attributes': [{'name': 'authorid', 'type': 'integer', 'foreign-key': {'table': 'authors', 'name': 'author_id', 'attributes': [
             {'name': 'name', 'type': 'text'},
             {'name': 'birthyear', 'type': 'integer'}
         ]}}], 'in-use': True, 'enabled': True},
@@ -29,12 +30,12 @@ def test_merge(books, meta, cr, lexer):
     assert merged_mapping == expected
 
 
-def test_merge_empty_column_in_requested_header(books, meta, cr, lexer):
-    table = 'books'
+def test_merge_empty_column_in_requested_header(books, meta, cr):
+    table_name = 'books'
     default_mapping = OdooHeaderParser(meta, cr).parse('books')
 
     header = 'title[unique=true],'
-    requested_mapping = HeaderParser(meta, table).parse_csv(header)
+    requested_mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 
@@ -54,13 +55,13 @@ def test_merge_empty_column_in_requested_header(books, meta, cr, lexer):
     assert merged_mapping == expected
 
 
-def test_merge_primary_key_as_unique_column(books, meta, cr, lexer):
+def test_merge_primary_key_as_unique_column(books, meta, cr):
     # test that if a primary key is the only unique column, then the merge maintains the primary-key attribute
-    table = 'properties'
-    default_mapping = OdooHeaderParser(meta, cr).parse(table)
+    table_name = 'properties'
+    default_mapping = OdooHeaderParser(meta, cr).parse(table_name)
 
     header = 'property_id[unique=true], name'
-    requested_mapping = HeaderParser(meta, table).parse_csv(header)
+    requested_mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
 
     merged_mapping = HeaderMerger().merge(default_mapping, requested_mapping)
 

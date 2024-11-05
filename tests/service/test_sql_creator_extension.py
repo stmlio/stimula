@@ -1,7 +1,8 @@
 import pandas as pd
 
 from stimula.compiler.alias_compiler import AliasCompiler
-from stimula.header.csv_header_parser import HeaderParser
+from stimula.compiler.model_compiler import ModelCompiler
+from stimula.header.stml_parser import StmlParser
 from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
 
 '''
@@ -16,9 +17,9 @@ This script tests generating queries for inserts, updates, and deletes for the i
 
 def test_insert_sql_creator_external_id(books, meta):
     # test that we can insert a record into an extension table
-    table = 'books'
+    table_name = 'books'
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [0, 'Pride and Prejudice', '12345'],
@@ -38,9 +39,9 @@ def test_insert_sql_creator_external_id(books, meta):
 
 def test_insert_sql_creator_external_id_unique(books, meta, ir_model_data):
     # test that we can detect a required insert based on unique external id
-    table = 'books'
+    table_name = 'books'
     header = 'title, bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books: unique=true]'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
 
     # 'Emma' exists, but with external id '11111'
     diff = pd.DataFrame([
@@ -61,9 +62,9 @@ def test_insert_sql_creator_external_id_unique(books, meta, ir_model_data):
 
 def test_update_sql_creator_unmodified_external_id(books, meta):
     # test we can update a record, even if there's an external id that is not marked as unique and was not modified
-    table = 'books'
+    table_name = 'books'
     header = 'title[unique=true], authorid(name), bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'],
@@ -78,11 +79,12 @@ def test_update_sql_creator_unmodified_external_id(books, meta):
     # compare
     assert actual == expected
 
+
 def test_update_sql_creator_unique_external_id(books, meta):
     # test we can update a record, identified by external id
-    table = 'books'
+    table_name = 'books'
     header = 'title, authorid(name), bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books: unique=true]'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen', '11111'],
@@ -92,16 +94,19 @@ def test_update_sql_creator_unique_external_id(books, meta):
     updates = UpdateSqlCreator().create_executors(mapping, diff)
     actual = list(updates)[0].queries()
 
-    expected = [("update books set authorid = authors.author_id from authors, ir_model_data where books.bookid = ir_model_data.res_id and authors.name = :name and ir_model_data.name = :name_1 and ir_model_data.module = 'netsuite_books' and ir_model_data.model = 'books'", {'name': 'Joseph Heller', 'name_1': '11111'})]
+    expected = [(
+                "update books set authorid = authors.author_id from authors, ir_model_data where books.bookid = ir_model_data.res_id and authors.name = :name and ir_model_data.name = :name_1 and ir_model_data.module = 'netsuite_books' and ir_model_data.model = 'books'",
+                {'name': 'Joseph Heller', 'name_1': '11111'})]
 
     # compare
     assert actual == expected
 
+
 def test_delete_sql_creator_external_id(books, meta):
     # test that we can insert a record into an extension table
-    table = 'books'
+    table_name = 'books'
     header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(HeaderParser(meta, table).parse_csv(header))
+    mapping = AliasCompiler().compile(ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [0, 'Pride and Prejudice', '12345'],

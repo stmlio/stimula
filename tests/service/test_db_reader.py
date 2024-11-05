@@ -1,4 +1,5 @@
-from stimula.header.csv_header_parser import HeaderParser
+from stimula.compiler.model_compiler import ModelCompiler
+from stimula.header.stml_parser import StmlParser
 from stimula.service.db_reader import DbReader
 
 db_reader = DbReader()
@@ -9,7 +10,7 @@ def test_get_select_statement(books, db, meta):
     header = 'title[unique=true], authorid(name)'
 
     # parse header to build mapping
-    mapping = HeaderParser(meta, table_name).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
 
     query = db_reader._create_select_query(mapping, None)
 

@@ -2,7 +2,8 @@ import json
 
 import pandas as pd
 
-from stimula.header.csv_header_parser import HeaderParser
+from stimula.compiler.model_compiler import ModelCompiler
+from stimula.header.stml_parser import StmlParser
 
 
 def test_get_jsonb(db, cnx, books, context):
@@ -191,10 +192,10 @@ def _test_post_jsonb_with_unicode(db, cnx, books, context):
         assert rows[0][0] == jsonb_data
 
 
-def test_conversion_of_json_with_null_value(db, meta, lexer):
-    table = 'properties'
+def test_conversion_of_json_with_null_value(db, meta):
+    table_name = 'properties'
     header = 'name, jsonb'
-    mapping = HeaderParser(meta, table).parse_csv(header)
+    mapping = ModelCompiler(meta).compile(StmlParser().parse_csv(table_name, header))
 
     # test that DB can correctly convert a df with a json that has a null value
     df = pd.DataFrame([
@@ -211,7 +212,7 @@ def test_conversion_of_json_with_null_value(db, meta, lexer):
     assert csv == expected
 
 
-def _test_post_json_object_as_unique_key(db, meta, lexer):
+def _test_post_json_object_as_unique_key(db, meta):
     # test that DB can post a json object as a unique key, this requires the resulting dict to be immutable
     # disabled for now, because the current implementation does not support json as unique key
     header = 'name, jsonb[unique=true]'
@@ -234,7 +235,7 @@ def _test_post_json_object_as_unique_key(db, meta, lexer):
     assert result.equals(expected)
 
 
-def test_post_json_from_string(db, meta, lexer, context):
+def test_post_json_from_string(db, meta, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier
     header = 'name[unique=true], jsonb[key=en_US]'
 
@@ -247,7 +248,8 @@ def test_post_json_from_string(db, meta, lexer, context):
 
     assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
 
-def test_post_json_from_string_unique(db, meta, lexer, context):
+
+def test_post_json_from_string_unique(db, meta, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier, even when it's a unique column
     header = 'name, jsonb[key=en_US: unique=true]'
 
