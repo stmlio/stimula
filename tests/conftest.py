@@ -2,6 +2,7 @@ import sys
 
 from stimula.compiler.model_compiler import ModelCompiler
 from stimula.service.abstract_orm import AbstractORM
+from stimula.service.odoo.jsonrpc_model_service import JsonRpcClient, JsonRpcModelService
 from stimula.service.odoo.postgres_model_service import PostgresModelService
 
 print('sys.path')
@@ -52,6 +53,16 @@ def db_params():
         "user": os.environ.get('DB_USER', 'postgres'),
         "password": os.environ.get('PASSWORD', 'admin'),
         "port": os.environ.get('PORT', "5433"),
+    }
+
+@pytest.fixture
+def jsonrpc_params():
+    # Database connection parameters
+    return {
+        "url": os.environ.get('ODOO_URL', 'http://localhost:8069/jsonrpc'),
+        "database": os.environ.get('ODOO_DB', 'afas18'),
+        "user": os.environ.get('ODOO_USER', 'admin'),
+        "password": os.environ.get('ODOO_PASSWORD', 'admin'),
     }
 
 
@@ -254,3 +265,17 @@ def test_table(cnx):
 @pytest.fixture
 def orm():
     return TestORM()
+
+
+@pytest.fixture
+def jsonrpc_client(jsonrpc_params):
+    return JsonRpcClient(
+        jsonrpc_params['url'],
+        jsonrpc_params['database'],
+        jsonrpc_params['user'],
+        jsonrpc_params['password'])
+
+@pytest.fixture
+def jsonrpc_model_service(jsonrpc_client):
+    return JsonRpcModelService(jsonrpc_client)
+

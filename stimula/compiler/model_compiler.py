@@ -21,7 +21,7 @@ class ModelCompiler:
 
     def compile(self, mapping):
         # resolve table
-        table = self._model_service.find_table(mapping['table'])
+        table = self._model_service.get_table(mapping['table'])
 
         # find primary key, required for ORM operations
         primary_keys = self._model_service.find_primary_keys(table)
@@ -69,7 +69,7 @@ class ModelCompiler:
         foreign_key = attribute['foreign-key']
 
         # resolve foriegn key table and column
-        target_table, target_column_name = self._model_service._resolve_foreign_key_table(table, attribute['name'])
+        target_table, target_column_name = self._model_service.resolve_foreign_key_table(table, attribute['name'])
 
         # if table found, set foreign key table and column
         if not target_table is None:
@@ -89,7 +89,7 @@ class ModelCompiler:
         # find foreign table name in modifiers, or default to Odoo's ir_model_data table
         table_name = modifiers.get('table', 'ir_model_data')
         # resolve the table
-        table = self._model_service.find_table(table_name)
+        table = self._model_service.get_table(table_name)
         # remove the attribute because we don't need it as a modifier
         if 'table' in modifiers:
             del modifiers['table']

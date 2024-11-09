@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 class ModelService(ABC):
 
     @abstractmethod
-    def find_table(self, table_name):
+    def get_table(self, table_name):
         pass
 
     @abstractmethod
@@ -19,5 +19,5 @@ class ModelService(ABC):
         pass
 
     @abstractmethod
-    def _resolve_foreign_key_table(self, table, column_name):
+    def resolve_foreign_key_table(self, table, column_name):
         pass

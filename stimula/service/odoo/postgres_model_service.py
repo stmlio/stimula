@@ -12,7 +12,7 @@ class PostgresModelService(ModelService):
     def __init__(self, meta):
         self._meta = meta
 
-    def find_table(self, table_name):
+    def get_table(self, table_name):
         table = self._meta.tables.get(table_name)
         if table is None:
             raise ValueError(f"Table '{table_name}' not found")
@@ -22,7 +22,7 @@ class PostgresModelService(ModelService):
         # return names of primary keys in table
         return [column.name for column in table.primary_key]
 
-    def _resolve_foreign_key_table(self, table, column_name):
+    def resolve_foreign_key_table(self, table, column_name):
         # get referred column
         if column_name not in table.columns:
             raise ValueError(f"Column '{column_name}' not found in table '{table.name}'")
