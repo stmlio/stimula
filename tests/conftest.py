@@ -106,7 +106,7 @@ def meta(cnx):
 
 @pytest.fixture
 def model_compiler(meta):
-    return ModelCompiler(PostgresModelService(meta))
+    return ModelCompiler(PostgresModelService())
 
 
 @pytest.fixture
@@ -172,6 +172,13 @@ def books(cnx):
 
         cnx.commit()
 
+@pytest.fixture
+def properties_relation(cnx, books):
+    # mimic the Odoo ir_model_data table that stores external ids
+    with cnx.cursor() as cr:
+        # update books table to create foreign key to properties table
+        cr.execute("ALTER TABLE books ADD COLUMN propertyid INTEGER")
+        cr.execute("ALTER TABLE books ADD CONSTRAINT fk_books_properties FOREIGN KEY (propertyid) REFERENCES properties(property_id)")
 
 @pytest.fixture
 def ir_model_data(cnx):

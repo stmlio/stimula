@@ -261,3 +261,38 @@ def test_post_json_from_string_unique(db, model_compiler, context):
     result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
 
     assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
+
+
+def _test_post_json_from_string_in_multi_index(db, model_compiler, context):
+    # test that DB can convert a string into a json object, based on the 'key' modifier, even when it's a unique column
+    header = 'name[unique=true], jsonb[key=en_US: unique=true]'
+
+    body = f'''
+        key 2, A string to convert to JSON
+    '''
+
+    # post jsonb
+    result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
+
+    assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
+
+
+def test_json_in_foreign_key(db, model_compiler, context, properties_relation, cnx):
+    # test that DB can use json in a foreign key relationship
+    jsonb_data = {'key 1': 'value 1'}
+    with cnx.cursor() as cr:
+        # insert row into properties
+        cr.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        # commit
+        cnx.commit()
+
+    header = 'title[unique=true], propertyid(jsonb)[key="key 1"]'
+
+    body = f'''
+        title 1, value 1
+    '''
+
+    # post jsonb
+    result = db.post_table_get_sql('books', header, None, body, insert=True, execute=True)
+
+    assert result['jsonb'][0].adapted == {"key 1": "value 1"}

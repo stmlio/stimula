@@ -21,3 +21,7 @@ class ModelService(ABC):
     @abstractmethod
     def resolve_foreign_key_table(self, table, column_name):
         pass
+
+    @abstractmethod
+    def read_table(self, mapping: dict, where_clause=None):
+        pass

@@ -1,16 +1,23 @@
 import pandas as pd
 
-from stimula.compiler.alias_compiler import AliasCompiler
 from stimula.compiler.header_compiler import HeaderCompiler
-from stimula.compiler.select_compiler import SelectCompiler
 from stimula.compiler.types_compiler import TypesCompiler
-from stimula.service.context import cnx_context
+from stimula.service.model_service import ModelService
+from stimula.service.odoo.jsonrpc_model_service import JsonRpcModelService
+from stimula.service.odoo.postgres_model_service import PostgresModelService
+
+MODEL_SERVICES = {
+    "sql": PostgresModelService,
+    "jsonrpc": JsonRpcModelService
+}
 
 
 class DbReader:
+    def __init__(self, protocol='sql'):
+        assert protocol in MODEL_SERVICES, f"Protocol '{protocol}' not supported"
+        self._model_service: ModelService = MODEL_SERVICES[protocol]()
+
     def read_from_db(self, mapping, where_clause, set_index=False):
-        # get sqlalchemy engine from context
-        engine = cnx_context.engine
 
         # get enabled and unique columns and column types
         column_names = HeaderCompiler().compile_list(mapping)
@@ -18,8 +25,7 @@ class DbReader:
         column_types = TypesCompiler().compile(mapping, column_names)
 
         # read dataframe from DB
-        query = self._create_select_query(mapping, where_clause)
-        df = pd.read_sql_query(query, engine)
+        df = self._model_service.read_table(mapping, where_clause)
 
         # set headers, they must equal the request headers for comparison
         df.columns = column_names
@@ -36,13 +42,6 @@ class DbReader:
             df.set_index(index_columns, inplace=True)
 
         return df
-
-    def _create_select_query(self, mapping, where_clause):
-        # add aliases and parameter names
-        aliased_mapping = AliasCompiler().compile(mapping)
-
-        # translate syntax tree to select query
-        return SelectCompiler().compile(aliased_mapping, where_clause)
 
     def _apply_converters(self, column_names, converters, df):
         # iterate the columns to apply converters one by one to either value or index column

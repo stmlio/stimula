@@ -103,7 +103,7 @@ class DB:
 
         return result[0]
 
-    def get_table(self, table_name, header, where_clause=None):
+    def get_table(self, table_name, header, where_clause=None, protocol='sql'):
         # create metadata object from context
         metadata = get_metadata(cnx_context.cnx)
 
@@ -116,9 +116,9 @@ class DB:
 
         else:
             # parse header to build syntax tree
-            mapping = ModelCompiler(PostgresModelService(metadata)).compile(StmlParser().parse_csv(table_name, header))
+            mapping = ModelCompiler(PostgresModelService()).compile(StmlParser().parse_csv(table_name, header))
 
-        df = DbReader().read_from_db(mapping, where_clause)
+        df = DbReader(protocol).read_from_db(mapping, where_clause)
 
         return df, mapping
 
@@ -264,7 +264,7 @@ class DB:
         assert header, "Header is required, either as a parameter or as the first line in the body with skiprows set to 1"
 
         # parse header to build syntax tree
-        mapping = ModelCompiler(PostgresModelService(get_metadata(cnx))).compile(StmlParser().parse_csv(table_name, header))
+        mapping = ModelCompiler(PostgresModelService()).compile(StmlParser().parse_csv(table_name, header))
 
         # read dataframe from request first, so we can give feedback on errors in the request
         df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script)

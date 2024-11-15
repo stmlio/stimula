@@ -2,10 +2,139 @@
 ModelService implementation for Odoo JSON-RPC
 """
 import json
+from itertools import chain
 
 import requests
 
 from stimula.service.model_service import ModelService
+
+
+class JsonRpcModelService(ModelService):
+    def __init__(self, client):
+        self.client = client
+
+    def get_table(self, name):
+        tables = self.client.execute_kw('ir.model', 'search_read', [[['model', '=', name]]], {'fields': ['id', 'model', 'field_id']})
+        if not tables:
+            raise ValueError(f"Table '{name}' not found")
+        if len(tables) > 1:
+            raise ValueError(f"More than one table found with name '{name}'")
+        table = tables[0]
+        return Table(self.client, table['model'], table['field_id'])
+
+    def find_primary_keys(self, table):
+        columns = table.columns
+        # in Odoo, if id exists, then it's the primary key.
+        # TODO: implement for many-to-many relationships
+        return [columns['id'].name] if 'id' in columns else []
+
+    def resolve_foreign_key_table(self, table, column_name):
+        # get referred column
+        if column_name not in table.columns:
+            raise ValueError(f"Column '{column_name}' not found in table '{table.name}'")
+        column = table.columns[column_name]
+        assert column.relation, f"Column '{column_name}' does not have a relation"
+        foreign_table = self.get_table(column.relation)
+        # for Odoo, assume the foreign column is 'id'
+        foreign_column_name = 'id'
+        return foreign_table, foreign_column_name
+
+    def read_table(self, mapping: dict, where_clause=None):
+        # get model name
+        model = mapping['table']
+
+        # read attribute values from the model
+        records = self._read_columns(model, mapping.get('columns', []))
+
+        # convert each row from list of tuples to dictionary, skip unresolved foreign keys
+        return [{f[1]: self._join_values(f[2]) for f in r if len(f) == 3} for r in records]
+
+    def _read_columns(self, model, columns):
+        # validate columns each have a single attribute, otherwise this approach fails
+        assert all(len(c.get('attributes', [])) == 1 for c in columns), "Each column must have exactly one attribute"
+
+        # list attributes
+        attributes = [c['attributes'][0] for c in columns]
+
+        # get attribute names
+        fields = [a['name'] for a in attributes]
+
+        # perform search_read on the model
+        records = self.client.execute_kw(model, 'search_read', [[]], {'fields': fields})
+
+        # resolve foreign keys for each attribute
+        records_resolved = list(zip(*[self._resolve_foreign_key(records, a) for a in attributes]))
+
+        # return resolved records as list
+        return records_resolved
+
+    def _resolve_foreign_key(self, records, attribute):
+        if not 'foreign-key' in attribute:
+            return [(r['id'], attribute['name'], [r[attribute['name']]]) for r in records]
+
+        # get foreign key attribute name
+        fk = attribute['name']
+
+        # list all unique foreign key ids
+        ids = list(set([r[fk][0] for r in records if r.get(fk)]))
+        if not ids:
+            return
+
+        # read all foreign key values, recurse to resolve nested foreign keys. Join keys and values for nested foreign keys.
+        fk_records = self._read_attributes(attribute['foreign-key']['table'], attribute['foreign-key']['attributes'], ids)
+
+        # create a dictionary of resolved foreign key records
+        fk_records_dict = {r[0]: r for r in fk_records}
+
+        # return foreign key values
+        records_resolved = [self.create_fk_record(fk, fk_records_dict, r) for r in records]
+
+        return records_resolved
+
+    def create_fk_record(self, fk, fk_records_dict, record):
+        # get foreign key value
+        fk_value = record.get(fk)
+
+        # if foreign key is empty or false, return empty record
+        if not fk_value:
+            return (record['id'],)
+
+        # return foreign key record
+        return (record['id'], f'{fk}({fk_records_dict.get(record[fk][0])[1]})', fk_records_dict.get(record[fk][0])[2])
+
+    def _read_attributes(self, model, attributes, ids):
+        # get attribute names
+        fields = [a['name'] for a in attributes]
+
+        # perform search_read on the model
+        records = self.client.execute_kw(model, 'search_read', [[['id', 'in', ids]]], {'fields': fields})
+
+        # resolve foreign keys for each attribute
+        records_resolved = list(zip(*[self._resolve_foreign_key(records, a) for a in attributes]))
+
+        # join keys, but don't join values yet
+        joined_records = [(r[0][0], ':'.join([f[1] for f in r]), list(chain(*[f[2] for f in r]))) for r in records_resolved]
+
+        return joined_records
+
+    def _join_values(self, values):
+        if len(values) == 0:
+            return ''
+        if len(values) == 1:
+            return values[0]
+        return ':'.join([self._quote(v) for v in values])
+
+    def _quote(self, value):
+        # no need to quote other than string
+        if not isinstance(value, str):
+            return value
+
+        # no need to quote value without a colon
+        if not ':' in value:
+            return value
+
+        # else quote
+        return f'"{value}"'
 
 
 class JsonRpcClient:
@@ -63,39 +192,8 @@ class JsonRpcClient:
             kwargs
         ]
         response = self.call('object', 'execute_kw', args)
-        assert 'result' in response, response.get('error', "Request failed.")
+        assert 'result' in response, response.get('error', "Request failed.").get('data', "Request failed.")
         return response.get('result')
-
-
-class JsonRpcModelService(ModelService):
-    def __init__(self, client):
-        self.client = client
-
-    def get_table(self, name):
-        tables = self.client.execute_kw('ir.model', 'search_read', [[['model', '=', name]]], {'fields': ['id', 'model', 'field_id']})
-        if not tables:
-            raise ValueError(f"Table '{name}' not found")
-        if len(tables) > 1:
-            raise ValueError(f"More than one table found with name '{name}'")
-        table = tables[0]
-        return Table(self.client, table['model'], table['field_id'])
-
-    def find_primary_keys(self, table):
-        columns = table.columns
-        # in Odoo, if id exists, then it's the primary key.
-        # TODO: implement for many-to-many relationships
-        return [columns['id'].name] if 'id' in columns else []
-
-    def resolve_foreign_key_table(self, table, column_name):
-        # get referred column
-        if column_name not in table.columns:
-            raise ValueError(f"Column '{column_name}' not found in table '{table.name}'")
-        column = table.columns[column_name]
-        assert column.relation, f"Column '{column_name}' does not have a relation"
-        foreign_table = self.get_table(column.relation)
-        # for Odoo, assume the foreign column is 'id'
-        foreign_column_name = 'id'
-        return foreign_table, foreign_column_name
 
 
 class Table:

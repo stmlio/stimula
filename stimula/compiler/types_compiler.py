@@ -16,7 +16,6 @@ import re
 
 import numpy as np
 import pandas as pd
-from numpy import isnan
 
 
 class TypesCompiler:
@@ -170,6 +169,7 @@ def strip_trailing_spaces(value):
     # strip spaces from string values
     return value.strip() if isinstance(value, str) else value
 
+
 def json_to_dict(json_str):
     # accept json strings that come from CSV using single quotes.
 
@@ -277,7 +277,13 @@ def _key_to_frozenset_converter(dtype, key):
 
 def _dict_to_frozenset_converter(dtype):
     # a dict is not hashable and can't be used as index field, so return frozen set instead of dict when reading from DB
-    return lambda value: frozenset(value.items())
+    return lambda value: _convert_dict_to_frozenset(dtype, value)
+
+
+def _convert_dict_to_frozenset(dtype, value):
+    if value is None:
+        return None
+    return frozenset(value.items())
 
 
 def _convert_to_dtype(dtype, value):
