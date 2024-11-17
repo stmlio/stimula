@@ -26,6 +26,7 @@ from psycopg2._json import Json
 
 from .query_executor import FailedQueryExecutor
 from ..compiler.header_compiler import HeaderCompiler
+from ..compiler.parameter_types_compiler import ParameterTypesCompiler
 from ..compiler.parameters_compiler import ParametersCompiler
 from ..header.values_parser import ValuesLexer, ValuesParser
 
@@ -87,8 +88,11 @@ class ExecutorCreator(ABC):
         # Split values if the column has more than one parameter names. A CSV cell can contain multiple values separated by a colon
         split_parameter_value_dict = self._split_columns(parameter_names, parameter_value_dict)
 
+        # get parameter types
+        parameter_types = ParameterTypesCompiler().compile(filtered_mapping)
+
         # Clean up values. Strip whitespace from strings. Convert values to match the DB schema. For example, convert '1' to 1 if the column is an int
-        value_dict_clean = self._clean_values_in_dict(split_parameter_value_dict)
+        value_dict_clean = self._clean_values_in_dict(split_parameter_value_dict, parameter_types)
 
         return filtered_mapping, value_dict_clean
 
@@ -179,10 +183,10 @@ class ExecutorCreator(ABC):
         # create dictionary with parameter names as keys and values as values
         return {name: value for name, value in zip(names, split_values)}
 
-    def _clean_values_in_dict(self, value_dict):
-        return {key: self._clean_value_in_dict(value) for key, value in value_dict.items()}
+    def _clean_values_in_dict(self, value_dict, parameter_types):
+        return {key: self._clean_value_in_dict(value, parameter_types[key]) for key, value in value_dict.items()}
 
-    def _clean_value_in_dict(self, value):
+    def _clean_value_in_dict(self, value, type):
         # strip whitespace from strings only
         if isinstance(value, str):
             value = value.strip()
@@ -209,6 +213,17 @@ class ExecutorCreator(ABC):
         if isinstance(value, frozenset):
             # convert to dict, then use psycopg's Json to correctly convert unicode characters
             value = Json(dict(value))
+
+        # type conversions
+        if type == 'int':
+            value = int(value)
+        elif type == 'varchar':
+            value = str(value)
+        elif type == 'float':
+            value = float(value)
+        elif type == 'bool':
+            # psycopg wants string representations for bools
+            value = 'true' if value else 'false'
 
         return value
 

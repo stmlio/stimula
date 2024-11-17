@@ -4,7 +4,6 @@ import pytest
 from numpy import int64, nan
 
 from stimula.compiler.alias_compiler import AliasCompiler
-from stimula.compiler.model_compiler import ModelCompiler
 from stimula.header.stml_parser import StmlParser
 from stimula.service.query_executor import OperationType
 from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
@@ -259,18 +258,22 @@ def test_split_value_json():
 
 def test_clean_values_in_dict():
     # test that it removes leading and trailing whitespace
-    assert InsertSqlCreator()._clean_values_in_dict({'name': '  Jane Austen  '}) == {'name': 'Jane Austen'}
+    assert InsertSqlCreator()._clean_values_in_dict({'name': '  Jane Austen  '}, {'name': 'text'}) == {'name': 'Jane Austen'}
     # test that it converts int64 to int
-    assert InsertSqlCreator()._clean_values_in_dict({'year': int64(1813)}) == {'year': 1813}
+    assert InsertSqlCreator()._clean_values_in_dict({'year': int64(1813)}, {'year': 'int'}) == {'year': 1813}
     # test that it converts a np.float64 into a Float
-    price = InsertSqlCreator()._clean_values_in_dict({'price': numpy.float64(12.34)})
+    price = InsertSqlCreator()._clean_values_in_dict({'price': numpy.float64(12.34)}, {'price': 'float'})
     assert type(price['price']) == float
     # test that it converts multiple values at once
-    assert InsertSqlCreator()._clean_values_in_dict({'name': '  Jane Austen  ', 'year': int64(1813)}) == {'name': 'Jane Austen', 'year': 1813}
+    assert InsertSqlCreator()._clean_values_in_dict({'name': '  Jane Austen  ', 'year': int64(1813)}, {'name': 'text', 'year': 'int'}) == {'name': 'Jane Austen', 'year': 1813}
     # test that it converts numpy bool to python bool
-    result = InsertSqlCreator()._clean_values_in_dict({'execute': numpy.True_})['execute']
+    result = InsertSqlCreator()._clean_values_in_dict({'execute': numpy.True_}, {'execute': 'bool'})['execute']
     # check that result is of type string, bec/ that's how psycopg represents booleans
     assert type(result) == str
+
+def test_clean_values_in_dict_type_conversion():
+    value = InsertSqlCreator()._clean_values_in_dict({'value': 123}, {'value': 'varchar'})['value']
+    assert type(value) == str
 
 
 def test_split_diff_self_other():
