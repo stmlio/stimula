@@ -75,15 +75,15 @@ class SelectClauseCompiler:
         return ' select ' + ', '.join(attributes)
 
     def _column(self, column):
-        attributes = self._attributes(column['attributes'])
+        attributes = self._attributes(column['attributes'], column)
         return attributes
 
-    def _attributes(self, attributes):
+    def _attributes(self, attributes, modifiers):
         # iterate attributes to get list of lists.
         # skip extensions on base table, because they are not columns. We'll insert them in a separate query
-        return [self._attribute(a) for a in attributes if not a.get('foreign-key', {}).get('extension')]
+        return [self._attribute(a, modifiers) for a in attributes if not a.get('foreign-key', {}).get('extension')]
 
-    def _attribute(self, attribute):
+    def _attribute(self, attribute, modifiers):
         if 'foreign-key' in attribute:
             foreign_key = attribute['foreign-key']
             # but table names may need an alias
@@ -92,6 +92,10 @@ class SelectClauseCompiler:
             target_column = foreign_key['name']
             # no need to recurse
             return f'{target_alias}.{target_column}'
+
+        if 'key' in modifiers:
+            # build json object
+            return f"jsonb_build_object('{modifiers['key']}', :{attribute["parameter"]})"
 
         # get value from parameter
         return f':{attribute["parameter"]}'
@@ -135,7 +139,7 @@ class FromClauseCompiler:
     def _attributes(self, attributes, source_alias, is_root):
         # assert len(attributes) == 1, f'Can only insert a single attribute per column, found: {attributes}'
         from_clauses = [self._attribute(attribute, source_alias, is_root) for attribute in attributes]
-        return ', '.join([c for c in from_clauses if c])
+        return ''.join([c for c in from_clauses if c])
 
     def _attribute(self, attribute, source_alias, is_root_table):
         # nothing to join if not a foreign key

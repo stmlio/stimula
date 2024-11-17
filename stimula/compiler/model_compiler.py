@@ -58,7 +58,12 @@ class ModelCompiler:
                 raise ValueError(f"Column '{attribute['name']}' not found in table '{table}'")
         else:
             column = table.columns[attribute['name']]
-            attribute['type'] = str(column.type).lower()
+            type = str(column.type).lower()
+            if type == 'jsonb' and 'key' in modifiers:
+                # represent jsonb column with key modifier as a string
+                attribute['type'] = 'text'
+            else:
+                attribute['type'] = type
 
         # resolve foreign key if needed
         if 'foreign-key' in attribute:

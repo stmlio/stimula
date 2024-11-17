@@ -73,7 +73,7 @@ class SelectClauseCompiler:
             return '\'\''
 
         # get the attributes for this column
-        selects = self._attributes(attributes, table_name)
+        selects = self._attributes(attributes, table_name, column)
 
         # if there's more than one attribute, we must cast jsonb columns to string
         cast_selects = self._cast_selects_if_needed(selects)
@@ -81,25 +81,31 @@ class SelectClauseCompiler:
         # colon separate attributes
         return ' || \':\' || '.join(cast_selects)
 
-    def _attributes(self, attributes, alias):
-        attribute_lists = [self._attribute(attribute, alias) for attribute in attributes]
+    def _attributes(self, attributes, alias, modifiers):
+        attribute_lists = [self._attribute(attribute, alias, modifiers) for attribute in attributes]
         # flatten list of list into a list
         return [attribute for attribute_list in attribute_lists for attribute in attribute_list]
 
-    def _attribute(self, attribute, alias):
-        # if this is not a foreign key, return alias and column name
-        if not 'foreign-key' in attribute:
-            column_name = attribute['name']
-            # also return the source attribute, so we can check the type later
-            return [(f'{alias}.{column_name}', attribute)]
-        else:
+    def _attribute(self, attribute, alias, modifiers):
+
+        if 'foreign-key' in attribute:
+            # table names may need an alias
             foreign_key = attribute['foreign-key']
-            # but table names may need an alias
             attributes = foreign_key['attributes']
             target_name = foreign_key['table']
             target_alias = foreign_key.get('alias', target_name)
             # recurse into foreign key table to get the attributes
-            return self._attributes(attributes, target_alias)
+            return self._attributes(attributes, target_alias, modifiers)
+
+        # if this is not a foreign key, return alias and column name
+        column_name = attribute['name']
+
+        # if there's a key, then return the json field
+        if 'key' in modifiers:
+            return [(f"{alias}.{column_name}->>'{modifiers['key']}'", attribute)]
+
+        # also return the source attribute, so we can check the type later
+        return [(f'{alias}.{column_name}', attribute)]
 
     def _cast_selects_if_needed(self, selects):
         # postgres can't concatenate jsonb columns to anything, so cast to string

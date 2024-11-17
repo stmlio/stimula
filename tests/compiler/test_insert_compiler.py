@@ -70,6 +70,14 @@ def test_multiple_join_alias_in_different_order(books, model_compiler, context):
     expected = 'insert into books(seriesid, title) select books_1.bookid, :title_2 from books as books_1 left join books as books_2 on books_1.seriesid = books_2.bookid where books_2.title = :title and books_1.title = :title_1'
     assert result == expected
 
+def test_double_join_query(books, model_compiler, context):
+    table_name = 'books'
+    header = 'title[unique=true], seriesid(authorid(name): seriesid(title))'
+    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    result = InsertCompiler().compile(mapping)
+    expected = 'insert into books(title, seriesid) select :title, books_1.bookid from books as books_1 left join authors on books_1.authorid = authors.author_id left join books as books_2 on books_1.seriesid = books_2.bookid where authors.name = :name and books_2.title = :title_1'
+    assert result == expected
+
 
 def test_extension(books, model_compiler, context, ir_model_data):
     # extension on primary table, must skip the extension attribute because that's a 'reverse' foreign key

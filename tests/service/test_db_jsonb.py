@@ -246,10 +246,19 @@ def test_post_json_from_string(cnx, db, model_compiler, context):
     # post jsonb
     result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
 
-    assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
+    # value should not be converted to json
+    assert result['rows'][0] == 1
+    assert result['jsonb'][0] == "A string to convert to JSON"
+
+    with cnx.cursor() as cr:
+        cr.execute("select jsonb from properties where name = 'key 2'")
+        rows = cr.fetchall()
+
+        # verify jsonb data
+        assert rows[0][0] == {"en_US": "A string to convert to JSON"}
 
 
-def test_post_json_from_string_unique(db, model_compiler, context):
+def test_post_json_from_string_unique(books, db, model_compiler, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier, even when it's a unique column
     header = 'name, jsonb[key=en_US: unique=true]'
 
@@ -260,7 +269,8 @@ def test_post_json_from_string_unique(db, model_compiler, context):
     # post jsonb
     result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
 
-    assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
+    assert result['rows'][0] == 1
+    assert result['jsonb'][0] == "A string to convert to JSON"
 
 
 def test_post_json_from_string_in_multi_index(db, context):
@@ -268,13 +278,14 @@ def test_post_json_from_string_in_multi_index(db, context):
     header = 'name[unique=true], jsonb[key=en_US: unique=true]'
 
     body = f'''
-        key 2, A string to convert to JSON
+        key 3, A string to convert to JSON
     '''
 
     # post jsonb
     result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
 
-    assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
+    assert result['rows'][0] == 1
+    assert result['jsonb'][0] == "A string to convert to JSON"
 
 
 def test_json_in_foreign_key(db, context, properties_relation, cnx):
@@ -286,16 +297,17 @@ def test_json_in_foreign_key(db, context, properties_relation, cnx):
         # commit
         cnx.commit()
 
-    header = 'title[unique=true], propertyid(jsonb)[key="key 1"]'
+    header = 'title[unique=true], authorid(name), propertyid(jsonb)[key="key 1"]'
 
     body = f'''
-        title 1, value 1
+        title 1, Jane Austen, value 1
     '''
 
     # post jsonb
     result = db.post_table_get_sql('books', header, None, body, insert=True, execute=True)
 
-    assert result['jsonb'][0].adapted == {"key 1": "value 1"}
+    assert result['rows'][0] == 1
+    assert result['jsonb'][0] == "value 1"
 
 def test_json_default_value(db, context, cnx):
     # test that DB can combine jsonb with a default value
@@ -308,4 +320,52 @@ def test_json_default_value(db, context, cnx):
     # post jsonb
     result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
 
-    assert result['jsonb'][0].adapted == {"key 1": "value 1"}
+    assert result['jsonb'][0] == "value 1"
+
+def test_update_json(books, db, context, cnx):
+    # test that DB can update json
+    jsonb_data = {'key 1': 'value 1'}
+    with cnx.cursor() as cr:
+        # insert row into properties
+        cr.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('name 1', json.dumps(jsonb_data)))
+        # commit
+        cnx.commit()
+
+    header = 'name[unique=true], jsonb[key="key 1"]'
+
+    body = f'''
+        name 1, value 2
+    '''
+
+    # post jsonb
+    result = db.post_table_get_sql('properties', header, None, body, update=True, execute=True)
+
+    expected = "update properties set jsonb = jsonb_set(jsonb, '{key 1}', to_jsonb(:jsonb::text)) where properties.name = :name"
+
+    assert (result.values[0] == [1, None, expected, 'name 1', 'value 2']).all()
+
+def test_post_json_set_two_keys(cnx, books, db, model_compiler, context):
+    # test that DB can convert a string into a json object, based on the 'key' modifier
+    header1 = 'name[unique=true], jsonb[key="key 1"]'
+
+    body1 = f'''
+        name 1, value 1
+    '''
+
+    # post jsonb
+    db.post_table_get_sql('properties', header1, None, body1, insert=True, execute=True, commit=True)
+
+    header2 = 'name[unique=true], jsonb[key="key 2"]'
+
+    body2 = f'''
+        name 1, value 2
+    '''
+    db.post_table_get_sql('properties', header2, None, body2, update=True, execute=True, commit=True)
+
+
+    with cnx.cursor() as cr:
+        cr.execute("select jsonb from properties where name = 'name 1'")
+        rows = cr.fetchall()
+
+        # verify jsonb data
+        assert rows[0][0] == {"key 1": "value 1", "key 2": "value 2"}

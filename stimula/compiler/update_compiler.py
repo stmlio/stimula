@@ -34,27 +34,23 @@ class UpdateClauseCompiler:
         table = mapping['table']
 
         # compile and filter
-        clause_lists = [self._column(c, table) for c in mapping['columns']]
+        clause_lists = [self._column(c) for c in mapping['columns']]
         clauses = [clause for clause_list in clause_lists for clause in clause_list]
 
         # comma separate cells
         return f'update {table} set ' + ', '.join(clauses)
 
-    def _column(self, column, table):
+    def _column(self, column):
         unique = column.get('unique', False)
         # can't update unique columns
         if unique:
             return []
 
-        return [self._attribute(attribute) for attribute in column['attributes']]
+        return [self._attribute(attribute, column) for attribute in column['attributes']]
 
-    def _attribute(self, attribute):
-        # if no foreign key, get value from parameter
-        if not 'foreign-key' in attribute:
-            column_name = attribute['name']
-            parameter_name = attribute['parameter']
-            return f'{column_name} = :{parameter_name}'
-        else:
+    def _attribute(self, attribute, modifiers):
+
+        if 'foreign-key' in attribute:
             foreign_key = attribute['foreign-key']
             column_name = attribute['name']
             # but table names may need an alias
@@ -63,3 +59,13 @@ class UpdateClauseCompiler:
             target_name = foreign_key['name']
             # no need to recurse
             return f'{column_name} = {target_alias}.{target_name}'
+
+        # if no foreign key, get value from parameter
+        column_name = attribute['name']
+        parameter_name = attribute['parameter']
+
+        # if key in modifiers, then set json field
+        if 'key' in modifiers:
+            return f"{column_name} = jsonb_set({column_name}, '{{{modifiers['key']}}}', to_jsonb(:{parameter_name}::text))"
+
+        return f'{column_name} = :{parameter_name}'

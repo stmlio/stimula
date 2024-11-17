@@ -37,7 +37,8 @@ class Executor(ABC):
 
     def _replace_placeholders(self, query):
         # replace :xyz with %(xyz)s using regex
-        return re.sub(r':(\w+)', r'%(\1)s', query)
+        # but make sure to not replace the '::text' type cast in to_jsonb(:parameter::text)
+        return re.sub(r'(?<!:):(\w+)', r'%(\1)s', query)
 
 
 class SimpleQueryExecutor(Executor):

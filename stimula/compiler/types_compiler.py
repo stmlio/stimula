@@ -92,11 +92,6 @@ class TypesCompiler:
         if 'default-value' in column:
             read_csv_converters.append(default_value_converter(dtype, column['default-value']))
 
-        # set converter if column has a key, use it to create a dict, but store in data frame as hashable frozenset
-        if 'key' in column:
-            read_csv_converters.append(_key_to_frozenset_converter(dtype, column['key']))
-            result['read_db_converter'] = _dict_to_frozenset_converter(dtype)
-
         # if type is text and there's no read_csv_converter yet, the default is to strip trailing spaces
         if dtype == 'string' and 'read_csv_converter' not in result:
             read_csv_converters.append(strip_trailing_spaces)

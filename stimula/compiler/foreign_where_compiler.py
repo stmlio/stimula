@@ -26,12 +26,12 @@ class ForeignWhereClauseCompiler:
         if self._is_delete_query and not column.get('unique', False):
             return []
 
-        return self._attributes(column['attributes'], table, True)
+        return self._attributes(column['attributes'], table, True, column)
 
-    def _attributes(self, attributes, source_alias, is_root):
-        return chain(*[self._attribute(attribute, source_alias, is_root) for attribute in attributes])
+    def _attributes(self, attributes, source_alias, is_root, modifiers):
+        return chain(*[self._attribute(attribute, source_alias, is_root, modifiers) for attribute in attributes])
 
-    def _attribute(self, attribute, alias, is_root_table):
+    def _attribute(self, attribute, alias, is_root_table, modifiers):
         if not 'foreign-key' in attribute:
 
             # no where-clause needed for root table. Only add where clauses for joined tables, but do register for alias
@@ -40,6 +40,11 @@ class ForeignWhereClauseCompiler:
 
             # terminate foreign key with an equation
             parameter_name = attribute.get('parameter', f'{attribute["name"]}')
+
+            # if there's a key, then address field in json object
+            if 'key' in modifiers:
+                return [f"{alias}.{attribute['name']}->>'{modifiers['key']}' = :{parameter_name}"]
+
             return [f'{alias}.{attribute["name"]} = :{parameter_name}']
 
         foreign_key = attribute['foreign-key']
@@ -51,7 +56,7 @@ class ForeignWhereClauseCompiler:
             return []
 
         # recurse
-        where_clause = self._attributes(foreign_key['attributes'], target_alias, False)
+        where_clause = self._attributes(foreign_key['attributes'], target_alias, False, modifiers)
 
         # add extension conditions if this is the root of an update or delete query
         if is_root_table and foreign_key.get('extension') and foreign_key.get('qualifier') and not self._is_insert_query:
