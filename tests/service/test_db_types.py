@@ -214,6 +214,7 @@ def test_insert_unicode_binary(db, cnx, books, context):
 
     # post csv
     df = db.post_table_get_sql('properties', 'name[unique=true], bytea', None, body, insert=True, update=True, delete=True, execute=True, commit=True)
+    df = df.drop(columns=['errors'])
 
     # assert that df has unicode data
     assert df.values[0][3] == 'abcd🐍ABCD'
@@ -227,6 +228,7 @@ def test_insert_latin_1_binary(db, cnx, books, context):
 
     # post csv
     df = db.post_table_get_sql('properties', 'name[unique=true], bytea', None, body, insert=True, update=True, delete=True, execute=True, commit=True)
+    df = df.drop(columns=['errors'])
 
     # assert that df has latin_1 data
     assert df.values[0][3] == 'abcd\xa0ABCD'

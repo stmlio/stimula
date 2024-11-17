@@ -16,6 +16,7 @@ def test_post_timestamp(db, books, context):
         columns=['rows', 'sql', 'name', 'value', 'timestamp']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -60,4 +61,5 @@ def test_update_timestamp(db, books, context):
         columns=['rows', 'sql', 'name', 'timestamp']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)

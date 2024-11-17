@@ -15,6 +15,7 @@ def test_post_table_update_non_empty_string_to_empty(db, books, context):
         columns=['rows', 'sql', 'title', 'description']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -40,6 +41,7 @@ def test_post_table_update_null_string_to_non_empty(db, books, context):
         columns=['rows', 'sql', 'title', 'description']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -65,6 +67,7 @@ def test_post_table_update_empty_string_to_non_empty(db, books, context):
         columns=['rows', 'sql', 'title', 'description']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -90,6 +93,7 @@ def test_post_table_update_empty_numeric_to_non_empty(db, books, context):
         columns=['rows', 'sql', 'title', 'price']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -106,6 +110,7 @@ def test_post_table_update_non_empty_numeric_to_empty(db, books, context):
         columns=['rows', 'sql', 'title', 'price']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -130,6 +135,7 @@ def test_post_table_update_varchar_with_number(db, books, context):
         columns=['rows', 'sql', 'title', 'description']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -148,6 +154,7 @@ def test_post_table_update_varchar_with_number_and_empty(db, books, context):
         columns=['rows', 'sql', 'title', 'description']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -158,7 +165,7 @@ def test_post_NA_string_value(db, books, context):
     '''
     df = db.post_table_get_sql('properties', 'name[unique=true], value', None, body, insert=True, execute=True)
 
-    assert list(df.columns) == ['rows', 'sql', 'name', 'value']
+    assert list(df.columns) == ['rows', 'errors', 'sql', 'name', 'value']
 
     dtypes = {'rows': pd.Int64Dtype(), 'sql': 'string', 'name': 'string', 'value': 'string'}
     expected = pd.DataFrame([
@@ -167,6 +174,7 @@ def test_post_NA_string_value(db, books, context):
         columns=['rows', 'sql', 'name', 'value']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 def test_post_table_with_filter(db, books, context):
@@ -183,6 +191,7 @@ def test_post_table_with_filter(db, books, context):
         columns=['rows', 'sql', 'title', 'description']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 def test_exception_when_all_columns_empty(db, books, context):

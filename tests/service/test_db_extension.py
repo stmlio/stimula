@@ -43,6 +43,8 @@ def test_insert_execute_extension(db, books, ir_model_data, context):
         columns=['rows', 'sql', 'title', 'name', 'name_1', 'module', 'model', 'res_id']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
+
     assert df.equals(expected)
 
 
@@ -64,6 +66,7 @@ def test_insert_unique_extension(db, books, ir_model_data, context):
         columns=['rows', 'sql', 'title', 'name', 'name_1', 'module', 'model', 'res_id']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 def test_insert_extension_defaults(db, books, ir_model_data):
@@ -104,6 +107,7 @@ def test_update_unique_extension(db, books, ir_model_data, context):
         columns=['rows', 'sql', 'title', 'name', 'name_1']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -129,6 +133,7 @@ def test_delete_execute_extension(db, books, ir_model_data, context):
         columns=['rows', 'sql', 'title', 'name_1', 'module', 'model', 'res_id']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 
@@ -156,6 +161,7 @@ def test_delete_unique_execute_extension(db, books, ir_model_data, context):
         columns=['rows', 'sql', 'name_1', 'module', 'model', 'res_id']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)
 
 def test_delete_unique_extension_skip_null(db, books, ir_model_data, context):
@@ -193,4 +199,5 @@ def test_delete_unique_extension_skip_null(db, books, ir_model_data, context):
         columns=['rows', 'sql', 'name_1', 'module', 'model', 'res_id']
     ).astype(dtypes)
 
+    df = df.drop(columns=['errors'])
     assert df.equals(expected)

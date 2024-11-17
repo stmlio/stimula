@@ -218,7 +218,7 @@ class DB:
     def _convert_to_df(self, sqls, showResult):
         # create empty pandas dataframe. First column contains sql
         if showResult:
-            result = pd.DataFrame(columns=['rows', 'sql'])
+            result = pd.DataFrame(columns=['rows', 'errors', 'sql'])
         else:
             result = pd.DataFrame(columns=['sql'])
 
@@ -228,7 +228,7 @@ class DB:
             # create dictionary with query and value_dict
             value_dict = {**er.params, 'sql': er.query}
             if showResult:
-                value_dict = {**value_dict, 'rows': er.rowcount}
+                value_dict = {**value_dict, 'rows': er.rowcount, 'errors': er.error}
             # append a new row to the bottom result with values from value dictionary using concat
             result = pd.concat([result, pd.DataFrame(value_dict, index=[index])], ignore_index=True)
             index += 1
