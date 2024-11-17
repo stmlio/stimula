@@ -217,7 +217,7 @@ class ExecutorCreator(ABC):
         # type conversions
         if type == 'int':
             value = int(value)
-        elif type == 'varchar':
+        elif type in ['varchar', 'text']:
             value = str(value)
         elif type == 'float':
             value = float(value)

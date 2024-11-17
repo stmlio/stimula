@@ -101,7 +101,8 @@ class SelectClauseCompiler:
         column_name = attribute['name']
 
         # if there's a key, then return the json field
-        if 'key' in modifiers:
+        # add check for jsonb, needed until we have nested modifiers
+        if 'key' in modifiers and attribute.get('jsonb'):
             return [(f"{alias}.{column_name}->>'{modifiers['key']}'", attribute)]
 
         # also return the source attribute, so we can check the type later

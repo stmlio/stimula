@@ -42,7 +42,8 @@ class ForeignWhereClauseCompiler:
             parameter_name = attribute.get('parameter', f'{attribute["name"]}')
 
             # if there's a key, then address field in json object
-            if 'key' in modifiers:
+            # extra check for jsonb, needed until we have nested modifiers
+            if 'key' in modifiers and attribute.get('jsonb'):
                 return [f"{alias}.{attribute['name']}->>'{modifiers['key']}' = :{parameter_name}"]
 
             return [f'{alias}.{attribute["name"]} = :{parameter_name}']

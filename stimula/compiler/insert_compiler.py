@@ -93,7 +93,8 @@ class SelectClauseCompiler:
             # no need to recurse
             return f'{target_alias}.{target_column}'
 
-        if 'key' in modifiers:
+        # extra check for jsonb, needed until we have nested modifiers
+        if 'key' in modifiers and attribute.get('jsonb'):
             # build json object
             return f"jsonb_build_object('{modifiers['key']}', :{attribute["parameter"]})"
 

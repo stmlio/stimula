@@ -62,6 +62,8 @@ class ModelCompiler:
             if type == 'jsonb' and 'key' in modifiers:
                 # represent jsonb column with key modifier as a string
                 attribute['type'] = 'text'
+                # also mark this as a jsonb column. This is needed until we have nested modifiers
+                attribute['jsonb'] = True
             else:
                 attribute['type'] = type
 
