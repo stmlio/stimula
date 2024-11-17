@@ -150,8 +150,10 @@ class CsvReader:
                 # convert column to the correct type
                 df[column] = df[column].astype(type)
             elif column in df.index.names and isinstance(df.index, pd.MultiIndex):
-                # convert multi-index to the correct type
-                df.index = df.index.set_levels(df.index.levels[df.index.names.index(column)].astype(type), level=column)
+                # a jsonb column has type object, but pandas does not support setting a multi-index to type object
+                if not type == 'object':
+                    # convert multi-index to the correct type
+                    df.index = df.index.set_levels(df.index.levels[df.index.names.index(column)].astype(type), level=column)
             elif column in df.index.names and not isinstance(df.index, pd.MultiIndex):
                 # convert single-level index to the correct type
                 df.index = df.index.astype(type)
@@ -322,6 +324,7 @@ def _hexdigest(x):
         return hashlib.sha1(x).hexdigest()
     # else raise an exception
     raise ValueError(f"Unsupported type {type(x)}")
+
 
 def base64encode(series):
     # UU-encode function for custom expression.

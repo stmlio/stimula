@@ -85,18 +85,25 @@ class TypesCompiler:
         # get the dtype for this column
         dtype = self._dtype(attributes)
 
+        # create list of read_csv_converters to handle multiple converters
+        read_csv_converters = []
+
         # set converter if column has a default value, so that pandas can set it right when reading the posted CSV
         if 'default-value' in column:
-            result['read_csv_converter'] = default_value_converter(dtype, column['default-value'])
+            read_csv_converters.append(default_value_converter(dtype, column['default-value']))
 
         # set converter if column has a key, use it to create a dict, but store in data frame as hashable frozenset
         if 'key' in column:
-            result['read_csv_converter'] = _key_to_frozenset_converter(dtype, column['key'])
+            read_csv_converters.append(_key_to_frozenset_converter(dtype, column['key']))
             result['read_db_converter'] = _dict_to_frozenset_converter(dtype)
 
         # if type is text and there's no read_csv_converter yet, the default is to strip trailing spaces
         if dtype == 'string' and 'read_csv_converter' not in result:
-            result['read_csv_converter'] = strip_trailing_spaces
+            read_csv_converters.append(strip_trailing_spaces)
+
+        # if there is at least one converter, set the pipeline converter
+        if read_csv_converters:
+            result['read_csv_converter'] = _pipeline_converter(read_csv_converters)
 
         # set the dtype
         result['read_csv_dtype'] = dtype
@@ -296,4 +303,14 @@ def _convert_to_dtype(dtype, value):
     if dtype == 'float':
         return float(value)
 
+    return value
+
+
+def _pipeline_converter(converters: list):
+    return lambda value: _pipeline(value, converters)
+
+
+def _pipeline(value, converters: list):
+    for converter in converters:
+        value = converter(value)
     return value

@@ -235,7 +235,7 @@ def _test_post_json_object_as_unique_key(db, model_compiler):
     assert result.equals(expected)
 
 
-def test_post_json_from_string(db, model_compiler, context):
+def test_post_json_from_string(cnx, db, model_compiler, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier
     header = 'name[unique=true], jsonb[key=en_US]'
 
@@ -263,7 +263,7 @@ def test_post_json_from_string_unique(db, model_compiler, context):
     assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
 
 
-def _test_post_json_from_string_in_multi_index(db, model_compiler, context):
+def test_post_json_from_string_in_multi_index(db, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier, even when it's a unique column
     header = 'name[unique=true], jsonb[key=en_US: unique=true]'
 
@@ -277,7 +277,7 @@ def _test_post_json_from_string_in_multi_index(db, model_compiler, context):
     assert result['jsonb'][0].adapted == {"en_US": "A string to convert to JSON"}
 
 
-def test_json_in_foreign_key(db, model_compiler, context, properties_relation, cnx):
+def test_json_in_foreign_key(db, context, properties_relation, cnx):
     # test that DB can use json in a foreign key relationship
     jsonb_data = {'key 1': 'value 1'}
     with cnx.cursor() as cr:
@@ -294,5 +294,18 @@ def test_json_in_foreign_key(db, model_compiler, context, properties_relation, c
 
     # post jsonb
     result = db.post_table_get_sql('books', header, None, body, insert=True, execute=True)
+
+    assert result['jsonb'][0].adapted == {"key 1": "value 1"}
+
+def test_json_default_value(db, context, cnx):
+    # test that DB can combine jsonb with a default value
+    header = 'name[unique=true], jsonb[key="key 1": default-value="value 1"]'
+
+    body = f'''
+        key 2, 
+    '''
+
+    # post jsonb
+    result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
 
     assert result['jsonb'][0].adapted == {"key 1": "value 1"}
