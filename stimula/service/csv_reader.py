@@ -16,11 +16,14 @@ _logger = logging.getLogger(__name__)
 
 
 class CsvReader:
-    def read_from_request(self, mapping, body, skiprows, post_script=None):
+    def read_from_request(self, mapping, body, skiprows, post_script=None, substitutions=None):
+        # prepare substitutions map
+        substitutions_map = self._create_substitutions_map(substitutions)
+
         # get columns and unique columns. Include all columns, including skip and orm-only columns.
         column_names = HeaderCompiler().compile_list(mapping, include_skip=True, include_orm_only=True)
         index_columns = HeaderCompiler().compile_list_unique(mapping)
-        column_types = TypesCompiler().compile(mapping, column_names, include_skip=True, include_orm_only=True)
+        column_types = TypesCompiler().compile(mapping, column_names, include_skip=True, include_orm_only=True, substitutions=substitutions_map)
         deduplicate_columns = HeaderCompiler().compile_list_deduplicate(mapping)
 
         # assert that at least one column header is not empty
@@ -255,7 +258,7 @@ class CsvReader:
                 expression = f"{column_name}={column['exp']}"
 
                 # evaluate the expression, pass custom functions
-                df.eval(expression, inplace=True, local_dict={'checksum': checksum, 'base64encode': base64encode})
+                df.eval(expression, inplace=True, local_dict={'checksum': checksum, 'base64encode': base64encode, 'concat': concat})
 
         # restore column names
         df.columns = original_column_names
@@ -306,6 +309,24 @@ class CsvReader:
         # execute the post script
         return module.execute(df)
 
+    def _create_substitutions_map(self, substitutions):
+        # convert substitutions table into a dictionary
+        if not substitutions:
+            # return None to indicate no substitutions were provided
+            return None
+
+        # read substitutions from binary string into a DataFrame
+        df_substitutions = pd.read_csv(StringIO(substitutions), dtype=str, na_filter=False)
+
+        # convert to dictionary, first column is the domain
+        map = {row.strip().lower(): {} for row in df_substitutions.iloc[:, 0].unique()}
+
+        # iterate rows, second column is the name, third column is the synonym
+        for row in df_substitutions.itertuples(index=False):
+            map[row[0].strip().lower()][row[2].strip().lower()] = row[1].strip()
+
+        return map
+
 
 def checksum(series):
     # checksum function for custom expression. Return hex digest for all items in series an return as type string.
@@ -346,3 +367,13 @@ def _base64encode(x: str | bytes | None) -> str | None:
 
     # Raise an exception for unsupported types
     raise ValueError(f"Unsupported type {type(x)}")
+
+
+def concat(*series):
+    # concat function for custom expression. Return concatenated string for all items in series an return as type string.
+    return pd.Series(list(zip(*series))).apply(_concat).astype('string')
+
+
+# a concat function that accepts any number of arguments and returns a concatenated string
+def _concat(args):
+    return ':'.join('"' + str(arg) + '"' for arg in args)

@@ -19,7 +19,7 @@ Operations: 20
 Success     19 (insert: 19, update: 0, delete: 0)
 Failed      1 (insert: 1, update: 0, delete: 0)
 Errors:
-Customers:6 - "Parsing error at token Token(type=':', value=':', lineno=1, index=0, end=1)" - Query: "N/A"
+Customers:6 - "Parsing error at token Token(type=':', value=':', lineno=1, index=0, end=1)" - Query: "N/A" - Parameters: "{}"
 Specify --commit (-C) to commit transaction.
 '''
     assert report == expected

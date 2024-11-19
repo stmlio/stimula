@@ -73,9 +73,9 @@ class GoogleSource:
         stml_evaluator = StmlEvaluator(lambda _, source_file_name: self._read_file(all_sheets, source_file_name))
 
         # replace STML files with their source
-        file_contents, table_names, context = stml_evaluator.replace_stmls_with_sources(file_names, sheets_as_df, table_names, context)
+        file_contents, table_names, context, substitutions = stml_evaluator.replace_stmls_with_sources(file_names, sheets_as_df, table_names, context)
 
-        return [file_contents, table_names, context]
+        return [file_contents, table_names, context, substitutions]
 
     def _table_name_from_file_name(self, file_name):
         # remove all characters after the first character that is not a letter or digit, or underscore

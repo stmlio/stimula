@@ -9,6 +9,8 @@ from stimula.header.stml_parser import StmlParser
 from stimula.service.csv_reader import CsvReader
 
 csv_reader = CsvReader()
+
+
 def test_read_from_request(db, books, model_compiler):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
@@ -90,6 +92,22 @@ def test_post_script(db):
     expected = df.T
 
     assert result.equals(expected)
+
+
+def test_create_substitutions_map():
+    csv = '''\
+    domain, name, synonym
+    Color,	White, White
+    Color,	White, Weiß
+    Color,	White, Blanc
+    Size,	S/M,   Small/Medium
+    Size,	L,	   Large
+    Size,10,10
+    '''
+    map = csv_reader._create_substitutions_map(csv)
+
+    assert map['color']['weiß'] == 'White'
+    assert map['size']['large'] == 'L'
 
 
 def _find_file(folder, file):

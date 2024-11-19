@@ -170,13 +170,13 @@ class DB:
         return self._convert_to_df(sqls, execute)
 
     def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
-                                   post_script=None, context=None):
+                                   post_script=None, context=None, substitutions=None):
 
         # create orm service if function is provided
         orm: Optional[AbstractORM] = self._orm_function() if self._orm_function else None
 
         # create diffs and sql
-        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm=orm)
+        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm=orm, substitutions=substitutions)
 
         # execute sql statements
         execution_results = self._execute_sql(query_executors, execute, commit)
@@ -251,7 +251,7 @@ class DB:
     def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
         pass
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None):
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None, substitutions=None):
         # get cnx from context
         cnx = cnx_context.cnx
 
@@ -267,7 +267,7 @@ class DB:
         mapping = ModelCompiler(PostgresModelService()).compile(StmlParser().parse_csv(table_name, header))
 
         # read dataframe from request first, so we can give feedback on errors in the request
-        df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script)
+        df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script, substitutions)
 
         # read dataframe from DB
         df_db = DbReader().read_from_db(mapping, where_clause, set_index=True)

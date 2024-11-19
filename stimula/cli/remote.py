@@ -71,7 +71,7 @@ class Invoker:
         # return the token from json response
         return self.get(path, params).text
 
-    def post_table(self, tables, header, query, files, skiprows, insert, update, delete, execute, commit, format, post_script, context):
+    def post_table(self, tables, header, query, files, skiprows, insert, update, delete, execute, commit, format, post_script, context, substitutions):
         assert files is not None and len(files) > 0, 'Provide one or more files to post'
 
         assert len(tables) == len(files), "Provide exactly one file per table, not %s" % len(files)

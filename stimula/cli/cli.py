@@ -200,7 +200,7 @@ class StimulaCLI:
                 source = FileSource()
 
             # read files from disk, stdin or google sheets. Also evaluate table and context
-            files, tables, context = source.read_files(args.files, args.tables, args.context)
+            files, tables, context, substitutions = source.read_files(args.files, args.tables, args.context)
 
             if args.mapping is None or args.mapping == '':
                 assert args.skip > 0, 'No mapping provided and skip is zero. Specify a mapping using the --mapping or -m flag, or provide a file with a header row and --skip > 0.'
@@ -220,7 +220,8 @@ class StimulaCLI:
                                         commit=args.commit,
                                         format=args.format,
                                         post_script=args.execute,
-                                        context=context)
+                                        context=context,
+                                        substitutions=substitutions)
 
             print(self._create_report(result, args.audit, args.verbose))
 

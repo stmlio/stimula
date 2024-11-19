@@ -47,7 +47,7 @@ class Invoker:
     def get_table(self, table, header, query):
         return self._db.get_table_as_csv(table, header, query)
 
-    def post_table(self, table, header, query, files, skiprows, insert, update, delete, execute, commit, format, post_script, context):
+    def post_table(self, table, header, query, files, skiprows, insert, update, delete, execute, commit, format, post_script, context, substitutions):
 
         if format == None or format == 'diff':
             # post table and get diff dataframes
@@ -64,8 +64,9 @@ class Invoker:
             # take body from first file and convert to string
             body = files[0].decode('utf-8')
             context = context[0] if context and len(context) == 1 else None
+            substitutions = substitutions[0].decode('utf-8') if substitutions[0] else None
             # post table and get full report
-            post_result = self._db.post_table_get_full_report(table[0], header, query, body, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script, context=context)
+            post_result = self._db.post_table_get_full_report(table[0], header, query, body, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script, context=context, substitutions=substitutions)
             # return json as string
             return post_result
         elif len(files) > 1:

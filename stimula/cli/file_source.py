@@ -75,7 +75,7 @@ class StmlEvaluator:
     def replace_stmls_with_sources(self, file_names, file_contents_as_df, table_names, context):
         # iterate over all files
         result = [self.replace_stml_with_source(n, f, t, c) for n, f, t, c in zip(file_names, file_contents_as_df, table_names, context)]
-        # unzip result to file_contents, table_names, context
+        # unzip result to file_contents, table_names, context, substitutions
         return zip(*result)
 
     def replace_stml_with_source(self, file_name, df, table_name, context):
@@ -83,11 +83,12 @@ class StmlEvaluator:
         if not df.iloc[0, 0].startswith('@'):
             # not an STML file, return as binary CSV string
             csv = df.to_csv(index=False, header=False).encode('utf-8')
-            return csv, table_name, context
+            return csv, table_name, context, None
 
-        # get source file name and target table name
+        # get source file name, target table name and optional substitutions file name
         source_file_name = self._get_source_file_name(df, file_name)
         target_table_name = self._get_target_table_name(df, file_name)
+        substitutions_file_name = self._get_substitutions_file_name(df, file_name)
 
         # read source and target columns from STML file
         source_and_target_column_list = self._get_source_and_target_columns(df, file_name)
@@ -101,8 +102,16 @@ class StmlEvaluator:
         # convert to csv
         source_csv = source_df.to_csv(index=False).encode('utf-8')
 
-        # return source file as csv, target table name, and the source file name as context
-        return [source_csv, target_table_name, source_file_name]
+        # read substitutions file if the file name is provided
+        if substitutions_file_name:
+            substitutions_df = self._file_reader_lambda(file_name, substitutions_file_name)
+            # convert to csv
+            substitutions_csv = substitutions_df.to_csv(index=False).encode('utf-8')
+        else:
+            substitutions_csv = None
+
+        # return source file as csv, target table name, the source file name and the substitions file as context
+        return [source_csv, target_table_name, source_file_name, substitutions_csv]
 
     def _get_source_file_name(self, df, file_name):
         # assert it contains '@source'
@@ -122,6 +131,17 @@ class StmlEvaluator:
         # assert it's not empty
         assert target_table_name, f"File {file_name} is an STML file, but B2 is empty."
         return target_table_name
+
+    def _get_substitutions_file_name(self, df, file_name):
+        # checkk if there's a substitutions header
+        if not '@substitutions' in df.iloc[2, 0] or not df.iloc[2, 1]:
+            # no substitutions file, return None
+            return None
+
+        # get substitutions file name from B3
+        substitutions_file_name = df.iloc[2, 1]
+
+        return substitutions_file_name
 
     def _get_source_and_target_columns(self, df, file_name):
         assert any(df[0] == 'source_column'), f"File {file_name} is an STML file, but does not contain 'source_column' in column A."
