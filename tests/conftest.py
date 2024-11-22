@@ -1,12 +1,10 @@
 import sys
 
-from stimula.compiler.model_compiler import ModelCompiler
 from stimula.service.abstract_orm import AbstractORM
 from stimula.service.odoo.jsonrpc_model_service import JsonRpcClient, JsonRpcModelService
 from stimula.service.odoo.postgres_model_service import PostgresModelService
+from stimula.stml.model_enricher import ModelEnricher
 
-print('sys.path')
-print(sys.path)
 import os
 
 import psycopg2
@@ -15,7 +13,6 @@ from sqlalchemy import (create_engine, MetaData)
 
 from stimula.service.auth import Auth
 from stimula.service.db import DB, cnx_context
-from stimula.header.header_lexer import HeaderLexer
 
 
 class TestAuth(Auth):
@@ -54,6 +51,7 @@ def db_params():
         "password": os.environ.get('PASSWORD', 'admin'),
         "port": os.environ.get('PORT', "5433"),
     }
+
 
 @pytest.fixture
 def jsonrpc_params():
@@ -105,8 +103,13 @@ def meta(cnx):
 
 
 @pytest.fixture
-def model_compiler(meta):
-    return ModelCompiler(PostgresModelService())
+def model_service(meta):
+    return PostgresModelService()
+
+
+@pytest.fixture
+def model_enricher(model_service):
+    return ModelEnricher(model_service)
 
 
 @pytest.fixture
@@ -172,6 +175,7 @@ def books(cnx):
 
         cnx.commit()
 
+
 @pytest.fixture
 def properties_relation(cnx, books):
     # mimic the Odoo ir_model_data table that stores external ids
@@ -179,6 +183,7 @@ def properties_relation(cnx, books):
         # update books table to create foreign key to properties table
         cr.execute("ALTER TABLE books ADD COLUMN propertyid INTEGER")
         cr.execute("ALTER TABLE books ADD CONSTRAINT fk_books_properties FOREIGN KEY (propertyid) REFERENCES properties(property_id)")
+
 
 @pytest.fixture
 def ir_model_data(cnx):
@@ -282,7 +287,7 @@ def jsonrpc_client(jsonrpc_params):
         jsonrpc_params['user'],
         jsonrpc_params['password'])
 
+
 @pytest.fixture
 def jsonrpc_model_service(jsonrpc_client):
     return JsonRpcModelService(jsonrpc_client)
-

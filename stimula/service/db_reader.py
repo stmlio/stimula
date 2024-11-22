@@ -1,10 +1,10 @@
 import pandas as pd
 
-from stimula.compiler.header_compiler import HeaderCompiler
-from stimula.compiler.types_compiler import TypesCompiler
 from stimula.service.model_service import ModelService
 from stimula.service.odoo.jsonrpc_model_service import JsonRpcModelService
 from stimula.service.odoo.postgres_model_service import PostgresModelService
+from stimula.stml.header_renderer import HeaderRenderer
+from stimula.stml.sql.types_renderer import TypesRenderer
 
 MODEL_SERVICES = {
     "sql": PostgresModelService,
@@ -20,9 +20,9 @@ class DbReader:
     def read_from_db(self, mapping, where_clause, set_index=False):
 
         # get enabled and unique columns and column types
-        column_names = HeaderCompiler().compile_list(mapping)
-        index_columns = HeaderCompiler().compile_list_unique(mapping)
-        column_types = TypesCompiler().compile(mapping, column_names)
+        column_names = HeaderRenderer().render_list(mapping)
+        index_columns = HeaderRenderer().render_list_unique(mapping)
+        column_types = TypesRenderer().render(mapping, column_names)
 
         # read dataframe from DB
         df = self._model_service.read_table(mapping, where_clause)

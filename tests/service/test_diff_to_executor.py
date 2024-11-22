@@ -1,15 +1,14 @@
 import pandas as pd
 
-from stimula.compiler.model_compiler import ModelCompiler
-from stimula.header.stml_parser import StmlParser
 from stimula.service.diff_to_executor import DiffToExecutor
+from stimula.stml.stml_parser import StmlParser
 
 
 # test diff_sql method
-def test_diff_executor(books, model_compiler):
+def test_diff_executor(books, model_enricher):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
 
     inserts = pd.DataFrame([
         ['Pride and Prejudice', 0, 'Jane Austen'],

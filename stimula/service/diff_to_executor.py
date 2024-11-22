@@ -10,7 +10,7 @@ from typing import Optional
 from .abstract_orm import AbstractORM
 from .orm_creator import InsertOrmCreator, UpdateOrmCreator, DeleteOrmCreator
 from .sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
-from ..compiler.alias_compiler import AliasCompiler
+from ..stml.alias_enricher import AliasEnricher
 
 
 class DiffToExecutor:
@@ -32,14 +32,14 @@ class DiffToExecutor:
 
     def _use_orm(self, mapping):
         # hard coded for now
-        return mapping.get('table') in ['ir_attachment']
+        return mapping.name in ['ir_attachment']
 
     def _sql_executor(self, mapping, diffs, context=None):
         # get from tuple
         inserts, updates, deletes = diffs
 
         # add alias and parameter names to mapping before creating sql
-        aliased_mapping = AliasCompiler().compile(mapping)
+        aliased_mapping = AliasEnricher().enrich(mapping)
 
         # create sql for each diff
         insert_sql = list(InsertSqlCreator().create_executors(aliased_mapping, inserts, context))
@@ -54,7 +54,7 @@ class DiffToExecutor:
         inserts, updates, deletes = diffs
 
         # add alias and parameter names to mapping before creating sql
-        aliased_mapping = AliasCompiler().compile(mapping)
+        aliased_mapping = AliasEnricher().enrich(mapping)
 
         # create sql for each diff
         insert_orm = list(InsertOrmCreator().create_executors(aliased_mapping, inserts, context, orm))

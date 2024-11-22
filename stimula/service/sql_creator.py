@@ -7,10 +7,11 @@ Email: romke@stml.io
 
 from .executor_creator import ExecutorCreator
 from .query_executor import SimpleQueryExecutor, DependentQueryExecutor, OperationType
-from ..compiler.delete_compiler import DeleteCompiler
-from ..compiler.header_compiler import HeaderCompiler
-from ..compiler.insert_compiler import InsertCompiler, ReturningClauseCompiler
-from ..compiler.update_compiler import UpdateCompiler
+from ..stml.header_renderer import HeaderRenderer
+from ..stml.model import Entity, Reference, Attribute
+from ..stml.sql.delete_renderer import DeleteRenderer
+from ..stml.sql.insert_renderer import InsertRenderer, ReturningClauseRenderer
+from ..stml.sql.update_renderer import UpdateRenderer
 
 
 class InsertSqlCreator(ExecutorCreator):
@@ -18,14 +19,14 @@ class InsertSqlCreator(ExecutorCreator):
         super().__init__()
         self.operation_type = OperationType.INSERT
 
-    def _create_executor(self, line_number, mapping, values, context, orm):
+    def _create_executor(self, line_number, mapping: Entity, values, context, orm):
         # Compile the filtered tree to get the query.
-        query = InsertCompiler().compile(mapping)
+        query = InsertRenderer().render(mapping)
 
         # is there an extension on the root table?
-        if not ReturningClauseCompiler().compile(mapping):
+        if not ReturningClauseRenderer().render(mapping):
             # yield query and split columns
-            return SimpleQueryExecutor(line_number, self.operation_type, mapping['table'], query, values, context)
+            return SimpleQueryExecutor(line_number, self.operation_type, mapping.name, query, values, context)
 
         else:
 
@@ -33,7 +34,7 @@ class InsertSqlCreator(ExecutorCreator):
             dependent_query = self._create_extension_insert_query(mapping, values)
 
             # return dependent query executor to execute both queries
-            return DependentQueryExecutor(line_number, self.operation_type, mapping['table'], context, (query, values), dependent_query)
+            return DependentQueryExecutor(line_number, self.operation_type, mapping.name, context, (query, values), dependent_query)
 
     def _create_non_unique_value_dict(self, mapping, row):
         # call super to get all other columns and values
@@ -43,7 +44,6 @@ class InsertSqlCreator(ExecutorCreator):
         non_unique_value_dict = {key: value for key, value in non_unique_value_dict.items() if not self._is_empty(value)}
 
         return non_unique_value_dict
-
 
     def _create_extension_insert_query(self, mapping, param):
         # get table, name parameter name and values
@@ -62,17 +62,17 @@ class UpdateSqlCreator(ExecutorCreator):
 
     def _create_executor(self, line_number, mapping, values, context, orm):
         # Compile the filtered tree to get the query.
-        query = UpdateCompiler().compile(mapping)
+        query = UpdateRenderer().render(mapping)
 
         # yield query and split columns
-        return SimpleQueryExecutor(line_number, self.operation_type, mapping['table'], query, values, context)
+        return SimpleQueryExecutor(line_number, self.operation_type, mapping.name, query, values, context)
 
     def _create_unique_value_dict(self, mapping, row):
         # split row in self and other
         self_row, other_row = self._split_diff_self_other(row)
 
         # get unique headers
-        unique_headers = HeaderCompiler().compile_list_unique(mapping)
+        unique_headers = HeaderRenderer().render_list_unique(mapping)
 
         # create dictionary with unique column headers as keys and values as values
         self_unique_value_dict = {header: self_row[header] for header in unique_headers}
@@ -88,7 +88,7 @@ class UpdateSqlCreator(ExecutorCreator):
         self_row, other_row = self._split_diff_self_other(row)
 
         # get unique columns
-        unique_headers = HeaderCompiler().compile_list_unique(mapping)
+        unique_headers = HeaderRenderer().render_list_unique(mapping)
 
         # get self columns by removing unique headers from self row keys
         non_unique_headers = [header for header in self_row.keys() if header not in unique_headers]
@@ -140,20 +140,19 @@ class UpdateSqlCreator(ExecutorCreator):
         return this != that
 
 
-
 class DeleteSqlCreator(ExecutorCreator):
     def __init__(self):
         super().__init__()
         self.operation_type = OperationType.DELETE
 
-    def _create_executor(self, line_number, mapping, values, context, orm):
+    def _create_executor(self, line_number, mapping: Entity, values, context, orm):
         # Compile the filtered tree to get the query.
-        query = DeleteCompiler().compile(mapping)
+        query = DeleteRenderer().render(mapping)
 
         # is there an extension on the root table?
-        if not ReturningClauseCompiler().compile(mapping):
+        if not ReturningClauseRenderer().render(mapping):
             # yield query and split columns
-            return SimpleQueryExecutor(line_number, self.operation_type, mapping['table'], query, values, context)
+            return SimpleQueryExecutor(line_number, self.operation_type, mapping.name, query, values, context)
 
         else:
 
@@ -161,7 +160,7 @@ class DeleteSqlCreator(ExecutorCreator):
             dependent_query = self._create_extension_delete_query(mapping, values)
 
             # return dependent query executor to execute both queries
-            return DependentQueryExecutor(line_number, self.operation_type, mapping['table'], context, (query, values), dependent_query)
+            return DependentQueryExecutor(line_number, self.operation_type, mapping.name, context, (query, values), dependent_query)
 
     def _create_non_unique_value_dict(self, mapping, row):
         # For deletes we don't need non-unique columns.
@@ -182,24 +181,25 @@ class DeleteSqlCreator(ExecutorCreator):
 
 
 class ExtensionValueHelper:
-    def get_extension_parameter_values(self, mapping, param):
+    def get_extension_parameter_values(self, mapping: Entity, param):
         # get extension foreign keys
-        extension_foreign_keys = [a['foreign-key'] for c in mapping['columns'] for a in c.get('attributes', []) if a.get('foreign-key', {}).get('extension')]
+        extension_foreign_keys = [a for a in mapping.attributes if isinstance(a, Reference) and a.extension]
 
         # only one extension is supported for now
         assert len(extension_foreign_keys) == 1, f'Only one extension is supported, found: {len(extension_foreign_keys)}'
         foreign_key = extension_foreign_keys[0]
 
         # foreign key must have a single attribute
-        assert len(foreign_key['attributes']) == 1, f'Foreign key must have a single attribute, found: {len(foreign_key["attributes"])}'
-        attribute = foreign_key['attributes'][0]
-        name_parameter_name = attribute['parameter']
+        assert len(foreign_key.attributes) == 1, f'Foreign key must have a single attribute, found: {len(foreign_key["attributes"])}'
+        attribute = foreign_key.attributes[0]
+        assert isinstance(attribute, Attribute), f'Foreign key attribute must be an attribute, found: {type(attribute)}'
+        name_parameter_name = attribute.parameter
 
-        table = foreign_key['table']
+        table = foreign_key.table
         name = param[name_parameter_name]
-        qualifier = foreign_key['qualifier']
+        qualifier = foreign_key.qualifier
         # TODO: replace with proper way to get the model name
-        model = mapping['table'].replace('_', '.')
+        model = mapping.name.replace('_', '.')
 
         # create values map
         values = {name_parameter_name: name, 'module': qualifier, 'model': model, 'res_id': None}

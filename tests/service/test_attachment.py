@@ -9,49 +9,49 @@ import pandas as pd
 import requests
 import hashlib
 
-from stimula.compiler.alias_compiler import AliasCompiler
-from stimula.compiler.model_compiler import ModelCompiler
-from stimula.compiler.select_compiler import SelectCompiler
-from stimula.header.stml_parser import StmlParser
+from stimula.stml.alias_enricher import AliasEnricher
+from stimula.stml.model import Reference, Attribute, Entity
+from stimula.stml.sql.select_renderer import SelectRenderer
+from stimula.stml.stml_parser import StmlParser
 from stimula.service.csv_reader import CsvReader
 from stimula.service.db_reader import DbReader
 
 
-def test_compile_header(model_compiler, ir_attachment):
+def test_compile_header(model_enricher, ir_attachment):
     table_name = 'ir_attachment'
-    header = 'res_id(bookid)[table=books: name=title: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], checksum[api=rest: host=$afas: url="/fileconnector/{guid}/{name}": unique=true]'
+    header = 'res_id(bookid)[table=books: target-name=title: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], checksum[api=rest: url="/fileconnector/{guid}/{name}": unique=true]'
 
     # compile header
-    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
 
-    expected = {'table': 'ir_attachment', 'primary-key': 'id', 'columns': [
-        {'attributes': [
-            {'name': 'res_id', 'type': 'integer', 'foreign-key': {'attributes': [{'name': 'bookid', 'type': 'integer'}], 'extension': True, 'name': 'title', 'table': 'books'}}
-        ], 'enabled': True, 'unique': True},
-        {'attributes': [{'name': 'guid'}], 'enabled': True, 'skip': True},
-        {'attributes': [{'name': 'name', 'type': 'varchar'}], 'enabled': True},
-        {'attributes': [{'name': 'res_model', 'type': 'varchar'}], 'default-value': 'account.move', 'enabled': True, 'unique': True},
-        {'api': 'rest', 'attributes': [{'name': 'checksum', 'type': 'varchar(40)'}], 'enabled': True, 'host': '$afas', 'unique': True, 'url': '/fileconnector/{guid}/{name}'}],
-                }
+    expected = Entity('ir_attachment', primary_key='id', attributes=[
+        Reference('res_id', table='books', target_name='title', extension=True, unique=True, enabled=True, attributes=[
+            Attribute('bookid', type='integer')
+        ]),
+        Attribute('guid', enabled=True, skip=True),
+        Attribute('name', type='varchar', enabled=True),
+        Attribute('res_model', type='varchar', default_value='account.move', enabled=True, unique=True),
+        Attribute('checksum', type='varchar(40)', enabled=True, unique=True, api='rest', url='/fileconnector/{guid}/{name}')
+    ])
 
     assert mapping == expected
 
 
-def test_create_select_query(model_compiler, ir_attachment):
+def test_create_select_query(model_enricher, ir_attachment):
     table_name = 'ir_attachment'
-    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="checksum(file)": unique=true]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
-    result = SelectCompiler().compile(mapping)
+    header = 'res_id(title)[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="checksum(file)": unique=true]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = SelectRenderer().render(mapping)
     expected = 'select books.title, ir_attachment.name, ir_attachment.res_model, ir_attachment.checksum ' \
                'from ir_attachment left join books on ir_attachment.res_id = books.bookid ' \
                'order by books.title, ir_attachment.res_model, ir_attachment.checksum'
     assert result == expected
 
 
-def test_run_select_query(model_compiler, ir_attachment):
+def test_run_select_query(model_enricher, ir_attachment):
     table_name = 'ir_attachment'
-    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    header = 'res_id(title)[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
     df = DbReader().read_from_db(mapping, None)
     assert df.shape == (1, 4)
     assert df.columns.tolist() == ['res_id(title)[unique=true]', 'name', 'res_model[default-value=account.move: unique=true]', 'checksum[exp=@checksum(file): unique=true]']
@@ -72,10 +72,10 @@ def test_file_connector_api():
     assert response.headers['Content-Disposition'] == 'attachment; filename=attachment.pdf'
 
 
-def test_read_csv_and_get_from_api(model_compiler):
+def test_read_csv_and_get_from_api(model_enricher):
     table_name = 'ir_attachment'
-    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    header = 'res_id(title)[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
 
     csv = 'Emma, abcdef, attachment 123.pdf, books, '
 
@@ -115,15 +115,19 @@ def test_checksum_eval():
     # Assert if the computed checksums match the expected ones
     assert df['a'].tolist() == expected_checksums
 
-def test_checksum_expression_in_csv():
 
+def test_checksum_expression_in_csv():
     # file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)"]
     # zipcode[exp="@zipcode(city)"]
     # my_color[exp="@substitute(your_color, filename)"]
-    mapping = {'columns': [
-        {'attributes': [{'name': 'file'}]},
-        {'attributes': [{'name': 'checksum'}], 'exp': '@checksum(file)'}
-    ]}
+    mapping = Entity('name', attributes=[
+        Attribute('file'),
+        Attribute('checksum', exp='@checksum(file)')
+    ])
+    # mapping = {'columns': [
+    #     {'attributes': [{'name': 'file'}]},
+    #     {'attributes': [{'name': 'checksum'}], 'exp': '@checksum(file)'}
+    # ]}
 
     csv = 'some string,'
     df = CsvReader().read_from_request(mapping, csv, 0)
@@ -136,29 +140,31 @@ def test_get_diff(books, ir_attachment, db, orm):
     body = '''
    Emma, abcdefgh, document_1.pdf, account.move,, 1234567890
     '''
-    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
+    header = 'res_id(title)[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
     create, update, delete = db.post_table_get_diff('ir_attachment', header, None, body, insert=True, update=True, delete=True, orm=orm)
     assert len(create) == 1
     assert update.empty
     assert len(delete) == 1
+
 
 def test_get_diff_no_change(books, ir_attachment, db, orm):
     # verify that processing a table with no changes results in empty diffs
     body = '''
    Emma, abcdefgh, attachment 123.pdf, account.move,, 1234567890
     '''
-    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
+    header = 'res_id(title)[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
     create, update, delete = db.post_table_get_diff('ir_attachment', header, None, body, insert=True, update=True, delete=True, orm=orm)
     assert len(create) == 1
     assert update.empty
     assert len(delete) == 1
+
 
 def test_get_diff_to_executor(books, ir_attachment, db, context, orm):
     # verify that processing a table can insert and delete
     body = '''
    Emma, abcdefgh, document_1.pdf, account.move,, 1234567890
     '''
-    header = 'res_id(title)[table=books: name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], '\
+    header = 'res_id(title)[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], ' \
              'file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true], datas[exp="@base64encode(file)": orm-only=true]'
     result = db.post_table_get_full_report('ir_attachment', header, None, body, insert=True, update=True, delete=True, execute=True)
-    assert 1==1
+    assert 1 == 1

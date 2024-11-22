@@ -2,8 +2,7 @@ import json
 
 import pandas as pd
 
-from stimula.compiler.model_compiler import ModelCompiler
-from stimula.header.stml_parser import StmlParser
+from stimula.stml.stml_parser import StmlParser
 
 
 def test_get_jsonb(db, cnx, books, context):
@@ -52,112 +51,88 @@ def test_post_jsonb(db, cnx, books, context):
         assert rows[0][0] == jsonb_data
 
 
-def test_get_jsonb_in_combined_column(db, cnx, books, context):
+def test_get_jsonb_in_combined_column(db, cnx, properties_relation, context):
     jsonb_data = {'key 1': 'value 1'}
-    with cnx.cursor() as cr:
+    with cnx.cursor() as cursor:
         # insert row into properties
-        cr.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        cursor.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        cursor.execute("update books set propertyid = %s where books.title = %s", (1, 'Emma'))
         # commit
         cnx.commit()
 
     # get table
-    df, _ = db.get_table('properties', 'name:jsonb')
+    header = 'title, propertyid(name:jsonb)'
+    df, _ = db.get_table('books', header)
 
-    # expected data types
-    dtypes = {'name:jsonb': 'string'}
-    expected = pd.DataFrame([
-        [f'key 1:{json.dumps(jsonb_data)}'],
-    ],
-        columns=['name:jsonb']
-    ).astype(dtypes)
+    # get row with title 'Emma'
+    df = df[df['title'] == 'Emma']
 
-    if not df.equals(expected):
-        print(df.compare(expected))
+    # get value from second column
+    value = df['propertyid(name:jsonb)'].values[0]
 
-    assert df.equals(expected)
+    expected = f'key 1:{json.dumps(jsonb_data)}'
+
+    assert value == expected
 
 
-def test_get_jsonb_in_combined_column_reversed(db, cnx, books, context):
+def test_get_jsonb_in_combined_column_reversed(db, cnx, properties_relation, context):
     # test that get table works with jsonb in combined column, the json field coming first
     jsonb_data = {'key 1': 'value 1'}
-    with cnx.cursor() as cr:
+    with cnx.cursor() as cursor:
         # insert row into properties
-        cr.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        cursor.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        cursor.execute("update books set propertyid = %s where books.title = %s", (1, 'Emma'))
         # commit
         cnx.commit()
 
     # get table
-    df, _ = db.get_table('properties', 'jsonb:name')
+    header = 'title, propertyid(jsonb:name)'
+    df, _ = db.get_table('books', header)
 
-    # expected data types
-    dtypes = {'jsonb:name': 'string'}
-    expected = pd.DataFrame([
-        [f'{json.dumps(jsonb_data)}:key 1'],
-    ],
-        columns=['jsonb:name']
-    ).astype(dtypes)
+    # get row with title 'Emma'
+    df = df[df['title'] == 'Emma']
 
-    if not df.equals(expected):
-        print(df.compare(expected))
+    # get value from second column
+    value = df['propertyid(jsonb:name)'].values[0]
 
-    assert df.equals(expected)
+    expected = f'{json.dumps(jsonb_data)}:key 1'
+
+    assert value == expected
 
 
-def test_get_jsonb_in_combined_unique_column(db, cnx, books, context):
+def test_get_jsonb_in_combined_unique_column(db, cnx, properties_relation, context):
     # test that get table works with jsonb in combined column that is also a unique column
     jsonb_data = {'key 1': 'value 1'}
-    with cnx.cursor() as cr:
+    with cnx.cursor() as cursor:
         # insert row into properties
-        cr.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        cursor.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        cursor.execute("update books set propertyid = %s where books.title = %s", (1, 'Emma'))
         # commit
         cnx.commit()
 
     # get table
-    df, _ = db.get_table('properties', 'jsonb:name[unique=true]')
+    header = 'title, propertyid(jsonb:name)[unique=true]'
+    df, _ = db.get_table('books', header)
 
-    # expected data types
-    dtypes = {'jsonb:name[unique=true]': 'string'}
-    expected = pd.DataFrame([
-        [f'{json.dumps(jsonb_data)}:key 1'],
-    ],
-        columns=['jsonb:name[unique=true]']
-    ).astype(dtypes)
+    # get row with title 'Emma'
+    df = df[df['title'] == 'Emma']
 
-    if not df.equals(expected):
-        print(df.compare(expected))
+    # get value from second column
+    value = df['propertyid(jsonb:name)[unique=true]'].values[0]
 
-    assert df.equals(expected)
+    expected = f'{json.dumps(jsonb_data)}:key 1'
+
+    assert value == expected
 
 
-def test_post_jsonb_in_combined_column(db, cnx, books, context):
-    jsonb_data = {'key 1': 'value 1'}
-    # replace double quotes with single quotes
-    json_string = json.dumps(jsonb_data).replace('"', "'")
-
-    body = f'''
-        key 1, 123:{json_string}
-    '''
-
-    # post jsonb
-    db.post_table_get_sql('properties', 'name[unique=true], number:jsonb', None, body, insert=True, execute=True)
-
-    with cnx.cursor() as cr:
-        # select from properties
-        cr.execute("select jsonb from properties")
-
-        # fetch all rows
-        rows = cr.fetchall()
-
-        # verify jsonb data
-        assert rows[0][0] == jsonb_data
 
 
 def test_get_jsonb_with_unicode_as_csv(db, cnx, books, context):
     # test getting a jsonb with unicode character that is represented as the original, and one that is escaped
     jsonb_data = {'key 1': 'value 1', 'snake': '🐍', 'nbsp': ' '}
-    with cnx.cursor() as cr:
+    with cnx.cursor() as cursor:
         # insert row into properties
-        cr.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
+        cursor.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('key 1', json.dumps(jsonb_data)))
         # commit
         cnx.commit()
 
@@ -192,10 +167,10 @@ def _test_post_jsonb_with_unicode(db, cnx, books, context):
         assert rows[0][0] == jsonb_data
 
 
-def test_conversion_of_json_with_null_value(db, model_compiler):
+def test_conversion_of_json_with_null_value(db, model_enricher):
     table_name = 'properties'
     header = 'name, jsonb'
-    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
 
     # test that DB can correctly convert a df with a json that has a null value
     df = pd.DataFrame([
@@ -212,7 +187,7 @@ def test_conversion_of_json_with_null_value(db, model_compiler):
     assert csv == expected
 
 
-def _test_post_json_object_as_unique_key(db, model_compiler):
+def _test_post_json_object_as_unique_key(db, model_enricher):
     # test that DB can post a json object as a unique key, this requires the resulting dict to be immutable
     # disabled for now, because the current implementation does not support json as unique key
     header = 'name, jsonb[unique=true]'
@@ -235,7 +210,7 @@ def _test_post_json_object_as_unique_key(db, model_compiler):
     assert result.equals(expected)
 
 
-def test_post_json_from_string(cnx, db, model_compiler, context):
+def test_post_json_from_string(cnx, db, model_enricher, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier
     header = 'name[unique=true], jsonb[key=en_US]'
 
@@ -258,7 +233,7 @@ def test_post_json_from_string(cnx, db, model_compiler, context):
         assert rows[0][0] == {"en_US": "A string to convert to JSON"}
 
 
-def test_post_json_from_string_unique(books, db, model_compiler, context):
+def test_post_json_from_string_unique(books, db, model_enricher, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier, even when it's a unique column
     header = 'name, jsonb[key=en_US: unique=true]'
 
@@ -297,7 +272,7 @@ def test_json_in_foreign_key(db, context, properties_relation, cnx):
         # commit
         cnx.commit()
 
-    header = 'title[unique=true], authorid(name), propertyid(jsonb)[key="key 1"]'
+    header = 'title[unique=true], authorid(name), propertyid(jsonb[key="key 1"])'
 
     body = f'''
         title 1, Jane Austen, value 1
@@ -308,6 +283,7 @@ def test_json_in_foreign_key(db, context, properties_relation, cnx):
 
     assert result['rows'][0] == 1
     assert result['jsonb'][0] == "value 1"
+
 
 def test_json_default_value(db, context, cnx):
     # test that DB can combine jsonb with a default value
@@ -321,6 +297,7 @@ def test_json_default_value(db, context, cnx):
     result = db.post_table_get_sql('properties', header, None, body, insert=True, execute=True)
 
     assert result['jsonb'][0] == "value 1"
+
 
 def test_update_json(books, db, context, cnx):
     # test that DB can update json
@@ -344,7 +321,8 @@ def test_update_json(books, db, context, cnx):
 
     assert (result.values[0] == [1, None, expected, 'name 1', 'value 2']).all()
 
-def test_post_json_set_two_keys(cnx, books, db, model_compiler, context):
+
+def test_post_json_set_two_keys(cnx, books, db, model_enricher, context):
     # test that DB can convert a string into a json object, based on the 'key' modifier
     header1 = 'name[unique=true], jsonb[key="key 1"]'
 
@@ -361,7 +339,6 @@ def test_post_json_set_two_keys(cnx, books, db, model_compiler, context):
         name 1, value 2
     '''
     db.post_table_get_sql('properties', header2, None, body2, update=True, execute=True, commit=True)
-
 
     with cnx.cursor() as cr:
         cr.execute("select jsonb from properties where name = 'name 1'")

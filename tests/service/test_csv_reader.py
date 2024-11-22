@@ -4,17 +4,16 @@ import re
 import pandas as pd
 import pytest
 
-from stimula.compiler.model_compiler import ModelCompiler
-from stimula.header.stml_parser import StmlParser
 from stimula.service.csv_reader import CsvReader
+from stimula.stml.stml_parser import StmlParser
 
 csv_reader = CsvReader()
 
 
-def test_read_from_request(db, books, model_compiler):
+def test_read_from_request(db, books, model_enricher):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
     body = '''
         Emma, Jane Austen
         War and Peace, Leo Tolstoy
@@ -43,11 +42,11 @@ def test_read_from_request(db, books, model_compiler):
     assert df.equals(expected)
 
 
-def test_read_from_request_trailing_space(db, books, model_compiler):
+def test_read_from_request_trailing_space(db, books, model_enricher):
     # test that trailing spaces are removed from the input
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
     body = '''
         Emma , Jane Austen 
     '''
@@ -63,11 +62,11 @@ def test_read_from_request_trailing_space(db, books, model_compiler):
     assert df.equals(expected)
 
 
-def test_read_from_request_detect_duplicate(db, books, model_compiler):
+def test_read_from_request_detect_duplicate(db, books, model_enricher):
     # verify that duplicates in the input halts the import
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
-    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
     body = '''
         Emma, Jane Austen
         War and Peace, Leo Tolstoy

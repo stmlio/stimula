@@ -1,3 +1,6 @@
+from stimula.stml.model import Entity, Attribute, Reference
+
+
 def test_login(jsonrpc_client):
     jsonrpc_client.login()
     assert jsonrpc_client.uid is not None
@@ -52,16 +55,12 @@ def test_search_read(jsonrpc_client):
 
 def test_search_read_foreign_field(jsonrpc_model_service):
     model_name = 'res.partner'
-    mapping = {'table': model_name, 'columns': [
-        {'attributes': [
-            {'name': 'name', 'type': 'text'}
-        ]},
-        {'attributes': [
-            {'name': 'company_id', 'type': 'integer', 'foreign-key': {'table': 'res.company', 'name': 'id', 'attributes': [
-                {'name': 'name', 'type': 'text'},
-            ]}}
-        ]},
-    ]}
+    mapping = Entity(name=model_name, attributes=[
+        Attribute(name='name', type='text'),
+        Reference(name='company_id', table='res.company', target_name='id', attributes=[
+            Attribute(name='name', type='text'),
+        ])
+    ])
     records = jsonrpc_model_service.read_table(mapping)
     # verify we have at least one company name
     company_names = [r['company_id(name)'] for r in records if r.get('company_id(name)')]
@@ -70,19 +69,17 @@ def test_search_read_foreign_field(jsonrpc_model_service):
 def test_search_read_nested_foreign_fields(jsonrpc_model_service):
     model_name = 'res.partner'
     # header = 'company_id(name:currency_id(name:symbol):parent_path)'
-    mapping = {'table': model_name, 'columns': [
-        {'attributes': [{'name': 'name', 'type': 'text'}]},
-        {'attributes': [
-            {'name': 'company_id', 'type': 'integer', 'foreign-key': {'table': 'res.company', 'name': 'id', 'attributes': [
-                {'name': 'name', 'type': 'text'},
-                {'name': 'currency_id', 'type': 'integer', 'foreign-key': {'table': 'res.currency', 'name': 'id', 'attributes': [
-                    {'name': 'name', 'type': 'text'},
-                    {'name': 'symbol', 'type': 'text'}
-                ]}},
-                {'name': 'parent_path', 'type': 'text'}
-            ]}}
-        ], 'enabled': True}
-    ]}
+    mapping = Entity(name=model_name, attributes=[
+        Attribute(name='name', type='text'),
+        Reference(name='company_id', table='res.company', target_name='id', enabled=True, attributes=[
+            Attribute(name='name', type='text'),
+            Reference(name='currency_id', table='res.currency', target_name='id', attributes=[
+                Attribute(name='name', type='text'),
+                Attribute(name='symbol', type='text'),
+            ]),
+            Attribute(name='parent_path', type='text'),
+        ])
+    ])
 
     records = jsonrpc_model_service.read_table(mapping)
     # verify we have at least one company name

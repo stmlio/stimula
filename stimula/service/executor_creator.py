@@ -25,10 +25,11 @@ import pandas as pd
 from psycopg2._json import Json
 
 from .query_executor import FailedQueryExecutor
-from ..compiler.header_compiler import HeaderCompiler
-from ..compiler.parameter_types_compiler import ParameterTypesCompiler
-from ..compiler.parameters_compiler import ParametersCompiler
-from ..header.values_parser import ValuesLexer, ValuesParser
+from ..stml.header_renderer import HeaderRenderer
+from ..stml.model import Entity
+from ..stml.sql.parameter_types_renderer import ParameterTypesRenderer
+from ..stml.sql.parameters_renderer import ParametersRenderer
+from ..stml.values_parser import ValuesLexer, ValuesParser
 
 
 class ExecutorCreator(ABC):
@@ -54,7 +55,7 @@ class ExecutorCreator(ABC):
             except Exception as e:
 
                 # yield query with line number and error message
-                yield FailedQueryExecutor(line_number, self.operation_type, mapping['table'], context, str(e))
+                yield FailedQueryExecutor(line_number, self.operation_type, mapping.name, context, str(e))
 
     def _prepare_and_create_executor(self, mapping, row, line_number, context=None, orm=None):
         # prepare mapping and values for row
@@ -80,7 +81,7 @@ class ExecutorCreator(ABC):
         filtered_mapping = self._filter_mapping(mapping, header_value_dict)
 
         # Compile the filtered tree to get parameter names for the query.
-        parameter_names = ParametersCompiler().compile(filtered_mapping)
+        parameter_names = ParametersRenderer().render(filtered_mapping)
 
         # Create the dictionary with parameter names as keys and values as values. An element may contain multiple parameters and values
         parameter_value_dict = self._map_parameter_names_with_values(filtered_mapping, parameter_names, header_value_dict)
@@ -89,7 +90,7 @@ class ExecutorCreator(ABC):
         split_parameter_value_dict = self._split_columns(parameter_names, parameter_value_dict)
 
         # get parameter types
-        parameter_types = ParameterTypesCompiler().compile(filtered_mapping)
+        parameter_types = ParameterTypesRenderer().render(filtered_mapping)
 
         # Clean up values. Strip whitespace from strings. Convert values to match the DB schema. For example, convert '1' to 1 if the column is an int
         value_dict_clean = self._clean_values_in_dict(split_parameter_value_dict, parameter_types)
@@ -98,7 +99,7 @@ class ExecutorCreator(ABC):
 
     def _create_unique_value_dict(self, mapping, row):
         # get unique column headers
-        unique_headers = HeaderCompiler().compile_list_unique(mapping)
+        unique_headers = HeaderRenderer().render_list_unique(mapping)
 
         # create dictionary with unique column headers as keys and values as values
         unique_value_dict = {header: row[header] for header in unique_headers}
@@ -107,7 +108,7 @@ class ExecutorCreator(ABC):
 
     def _create_non_unique_value_dict(self, mapping, row):
         # get non-unique headers
-        non_unique_headers = HeaderCompiler().compile_list_non_unique(mapping)
+        non_unique_headers = HeaderRenderer().render_list_non_unique(mapping)
 
         # create dictionary with non-unique column headers as keys and values as values
         non_unique_value_dict = {header: row[header] for header in non_unique_headers}
@@ -121,21 +122,21 @@ class ExecutorCreator(ABC):
         # then this method ensures the value is included.
 
         # get non-unique headers
-        non_unique_headers = HeaderCompiler().compile_list_non_unique_root_extension(mapping)
+        non_unique_headers = HeaderRenderer().render_list_non_unique_root_extension(mapping)
 
         # create dictionary with non-unique column headers as keys and values as values
         non_unique_value_dict = {header: row[header] for header in non_unique_headers}
 
         return non_unique_value_dict
 
-    def _filter_mapping(self, mapping, value_dict):
+    def _filter_mapping(self, mapping: Entity, value_dict):
         # filter columns by those that have a value in value_dict
 
         # create a list of column headers
-        headers = HeaderCompiler().compile_list(mapping, include_skip=True, include_orm_only=True)
+        headers = HeaderRenderer().render_list(mapping, include_skip=True, include_orm_only=True)
 
         # create a list of all columns
-        all_columns = mapping['columns']
+        all_columns = mapping.attributes
 
         assert len(headers) == len(all_columns), f'Number of headers must equal number of columns, found: {len(headers)} and {len(all_columns)}'
 
@@ -143,14 +144,14 @@ class ExecutorCreator(ABC):
         filter_columns = [item for item, header in zip(all_columns, headers) if header in value_dict]
 
         # create a copy of mapping with columns replaced by filtered columns
-        filtered_mapping = mapping.copy()
-        filtered_mapping['columns'] = filter_columns
+        filtered_mapping = Entity(mapping.name)
+        filtered_mapping.attributes = filter_columns
 
         return filtered_mapping
 
     def _map_parameter_names_with_values(self, filtered_mapping, parameter_names, value_dict):
         # create a list of column headers. Include the ORM-only columns, because we need them to write to ORM.
-        headers = HeaderCompiler().compile_list(filtered_mapping, include_orm_only=True)
+        headers = HeaderRenderer().render_list(filtered_mapping, include_orm_only=True)
 
         # create a dictionary with parameter names as keys and values as values
         return {parameter_name: value_dict[header] for parameter_name, header in zip(parameter_names, headers)}

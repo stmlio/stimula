@@ -12,12 +12,6 @@ import pandas as pd
 import psycopg2
 from pandas import DataFrame
 
-from stimula.compiler.header_compiler import HeaderCompiler
-from stimula.compiler.select_compiler import SelectCompiler
-from stimula.compiler.types_compiler import TypesCompiler
-from stimula.header.header_lexer import HeaderLexer
-from stimula.header.header_merger import HeaderMerger
-from stimula.header.odoo_header_parser import OdooHeaderParser
 from .abstract_orm import AbstractORM
 from .context import cnx_context, get_metadata
 from .csv_reader import CsvReader
@@ -26,15 +20,21 @@ from .diff_to_executor import DiffToExecutor
 from .odoo.postgres_model_service import PostgresModelService
 from .query_executor import OperationType
 from .reporter import Reporter
-from ..compiler.model_compiler import ModelCompiler
-from ..header.stml_parser import StmlParser
+from ..stml.header_renderer import HeaderRenderer
+from ..stml.json_renderer import JsonRenderer
+from ..stml.model import Entity
+from ..stml.model_enricher import ModelEnricher
+from ..stml.sql.select_renderer import SelectRenderer
+from ..stml.sql.types_renderer import TypesRenderer
+from ..stml.stml_creator import StmlCreator
+from ..stml.stml_merger import StmlMerger
+from ..stml.stml_parser import StmlParser
 
 _logger = logging.getLogger(__name__)
 
 
 class DB:
     def __init__(self, orm_function=None):
-        self._lexer = HeaderLexer()
         self._diff_to_sql = DiffToExecutor()
         # delay orm creation until needed
         self._orm_function = orm_function
@@ -82,16 +82,17 @@ class DB:
 
         if not header:
             # if header parameter is empty, then use the default header
-            default_mapping = OdooHeaderParser(metadata, cnx_context.cr).parse(table_name)
+            default_mapping = StmlCreator(PostgresModelService()).create(table_name)
 
             # remove columns that are not enabled
-            mapping = {**default_mapping, 'columns': [c for c in default_mapping['columns'] if c.get('enabled', False)]}
+            attributes = [a for a in default_mapping.attributes if a.enabled]
+            mapping = Entity(table_name, attributes)
 
         else:
             # parse header to build syntax tree
-            mapping = ModelCompiler(metadata).compile(StmlParser().parse_csv(table_name, header))
+            mapping = ModelEnricher(metadata).enrich(StmlParser().parse_csv(table_name, header))
 
-        query = SelectCompiler().compile_count_query(mapping, where_clause)
+        query = SelectRenderer().compile_count_query(mapping, where_clause)
 
         cr = cnx_context.cr
 
@@ -109,14 +110,15 @@ class DB:
 
         if not header:
             # if header parameter is empty, then use the default header
-            default_mapping = OdooHeaderParser(metadata, cnx_context.cr).parse(table_name)
+            default_mapping = StmlCreator(PostgresModelService()).create(table_name)
 
             # remove columns that are not enabled
-            mapping = {**default_mapping, 'columns': [c for c in default_mapping['columns'] if c.get('enabled', False)]}
+            attributes = [a for a in default_mapping.attributes if a.enabled]
+            mapping = Entity(table_name, attributes)
 
         else:
             # parse header to build syntax tree
-            mapping = ModelCompiler(PostgresModelService()).compile(StmlParser().parse_csv(table_name, header))
+            mapping = ModelEnricher(PostgresModelService()).enrich(StmlParser().parse_csv(table_name, header))
 
         df = DbReader(protocol).read_from_db(mapping, where_clause)
 
@@ -130,8 +132,8 @@ class DB:
 
     def convert_to_csv(self, df, mapping, escapechar=None):
         # need converters from types compiler
-        column_names = HeaderCompiler().compile_list(mapping)
-        column_types = TypesCompiler().compile(mapping, column_names)
+        column_names = HeaderRenderer().render_list(mapping)
+        column_types = TypesRenderer().render(mapping, column_names)
 
         # get converters from column_types
         converters = column_types['write_csv_converters']
@@ -264,7 +266,7 @@ class DB:
         assert header, "Header is required, either as a parameter or as the first line in the body with skiprows set to 1"
 
         # parse header to build syntax tree
-        mapping = ModelCompiler(PostgresModelService()).compile(StmlParser().parse_csv(table_name, header))
+        mapping = ModelEnricher(PostgresModelService()).enrich(StmlParser().parse_csv(table_name, header))
 
         # read dataframe from request first, so we can give feedback on errors in the request
         df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script, substitutions)
@@ -347,7 +349,7 @@ class DB:
         mapping = self._get_header_mapping(table_name, header)
 
         # compile into header
-        json_header = HeaderCompiler().compile_json(mapping)
+        json_header = JsonRenderer().render_json(mapping)
 
         return json_header
 
@@ -356,7 +358,7 @@ class DB:
         mapping = self._get_header_mapping(table_name, header)
 
         # compile into header
-        csv_header = HeaderCompiler().compile_csv(mapping)
+        csv_header = HeaderRenderer().render_csv(mapping)
 
         return csv_header
 
@@ -365,17 +367,17 @@ class DB:
         metadata = get_metadata(cnx_context.cnx)
 
         # create default mapping from table
-        mapping = OdooHeaderParser(metadata, cnx_context.cr).parse(table_name)
+        mapping = StmlCreator(PostgresModelService()).create(table_name)
 
         if not header:
             # return full mapping
             return mapping
 
         # parse header to build syntax tree
-        parsed_header = ModelCompiler(metadata).compile(StmlParser().parse_csv(table_name, header))
+        parsed_header = ModelEnricher(PostgresModelService()).enrich(StmlParser().parse_csv(table_name, header))
 
         # merge headers
-        merged_mapping = HeaderMerger().merge(mapping, parsed_header)
+        merged_mapping = StmlMerger().merge(mapping, parsed_header)
 
         return merged_mapping
 
@@ -480,10 +482,10 @@ class DB:
         cnx = cnx_context.cnx
 
         # parse header to build syntax tree
-        mapping = ModelCompiler(get_metadata(cnx)).compile(StmlParser().parse_csv(table_name, header))
+        mapping = ModelEnricher(PostgresModelService()).enrich(StmlParser().parse_csv(table_name, header))
 
         # reconstruct original header from tree
-        column_keys = HeaderCompiler().compile_list(mapping)
+        column_keys = HeaderRenderer().render_list(mapping)
 
         # create result list for selected and unselected columns
         result_columns = []

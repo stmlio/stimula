@@ -7,12 +7,12 @@ Email: romke@stml.io
 
 from .executor_creator import ExecutorCreator
 from .orm_executor import CreateOrmExecutor
-from .query_executor import SimpleQueryExecutor, DependentQueryExecutor, OperationType
-from ..compiler.delete_compiler import DeleteCompiler
-from ..compiler.header_compiler import HeaderCompiler
-from ..compiler.insert_compiler import ReturningClauseCompiler
-from ..compiler.orm_insert_compiler import OrmInsertCompiler, OrmParameterNamesCompiler
-from ..compiler.update_compiler import UpdateCompiler
+from .query_executor import SimpleQueryExecutor, OperationType
+from ..stml.header_renderer import HeaderRenderer
+from ..stml.model import Entity, Reference, Attribute
+from ..stml.orm.orm_insert_renderer import OrmInsertRenderer, OrmParameterNamesRenderer
+from ..stml.sql.delete_renderer import DeleteRenderer
+from ..stml.sql.update_renderer import UpdateRenderer
 
 
 class InsertOrmCreator(ExecutorCreator):
@@ -20,20 +20,19 @@ class InsertOrmCreator(ExecutorCreator):
         super().__init__()
         self.operation_type = OperationType.INSERT
 
-    def _create_executor(self, line_number, mapping, values, context, orm):
+    def _create_executor(self, line_number, mapping: Entity, values, context, orm):
         # Compile the filtered tree to get the query.
-        query = OrmInsertCompiler().compile(mapping)
+        query = OrmInsertRenderer().render(mapping)
 
         # get parameter names for orm
-        orm_parameter_names = OrmParameterNamesCompiler().compile(mapping)
+        orm_parameter_names = OrmParameterNamesRenderer().render(mapping)
 
         # split values in query and orm values
         query_values = {key: value for key, value in values.items() if key not in orm_parameter_names}
         orm_values = {key: value for key, value in values.items() if key in orm_parameter_names}
 
         # return query
-        return CreateOrmExecutor(line_number, self.operation_type, mapping['table'], query, query_values, orm_values, context, orm)
-
+        return CreateOrmExecutor(line_number, self.operation_type, mapping.name, query, query_values, orm_values, context, orm)
 
     def _create_non_unique_value_dict(self, mapping, row):
         # call super to get all other columns and values
@@ -45,26 +44,25 @@ class InsertOrmCreator(ExecutorCreator):
         return non_unique_value_dict
 
 
-
 class UpdateOrmCreator(ExecutorCreator):
 
     def __init__(self):
         super().__init__()
         self.operation_type = OperationType.UPDATE
 
-    def _create_executor(self, line_number, mapping, values, context, orm):
+    def _create_executor(self, line_number, mapping: Entity, values, context, orm):
         # Compile the filtered tree to get the query.
-        query = UpdateCompiler().compile(mapping)
+        query = UpdateRenderer().render(mapping)
 
         # yield query and split columns
-        return SimpleQueryExecutor(line_number, self.operation_type, mapping['table'], query, values, context)
+        return SimpleQueryExecutor(line_number, self.operation_type, mapping.name, query, values, context)
 
     def _create_unique_value_dict(self, mapping, row):
         # split row in self and other
         self_row, other_row = self._split_diff_self_other(row)
 
         # get unique headers
-        unique_headers = HeaderCompiler().compile_list_unique(mapping)
+        unique_headers = HeaderRenderer().render_list_unique(mapping)
 
         # create dictionary with unique column headers as keys and values as values
         self_unique_value_dict = {header: self_row[header] for header in unique_headers}
@@ -80,7 +78,7 @@ class UpdateOrmCreator(ExecutorCreator):
         self_row, other_row = self._split_diff_self_other(row)
 
         # get unique columns
-        unique_headers = HeaderCompiler().compile_list_unique(mapping)
+        unique_headers = HeaderRenderer().render_list_unique(mapping)
 
         # get self columns by removing unique headers from self row keys
         non_unique_headers = [header for header in self_row.keys() if header not in unique_headers]
@@ -132,28 +130,28 @@ class UpdateOrmCreator(ExecutorCreator):
         return this != that
 
 
-
 class DeleteOrmCreator(ExecutorCreator):
     def __init__(self):
         super().__init__()
         self.operation_type = OperationType.DELETE
 
-    def _create_executor(self, line_number, mapping, values, context, orm):
+    def _create_executor(self, line_number, mapping: Entity, values, context, orm):
         # Compile the filtered tree to get the query.
-        query = DeleteCompiler().compile(mapping)
+        query = DeleteRenderer().render(mapping)
 
-        # is there an extension on the root table?
-        if not ReturningClauseCompiler().compile(mapping):
+        # TODO: decide if we need to delete the matching record in the extension table.
+        # For now, we don't delete the extension record.
+        # if not ReturningClauseRenderer().render(mapping):
             # yield query and split columns
-            return SimpleQueryExecutor(line_number, self.operation_type, mapping['table'], query, values, context)
+        return SimpleQueryExecutor(line_number, self.operation_type, mapping.name, query, values, context)
 
-        else:
+        # else:
 
             # create a separate query for the extension
-            dependent_query = self._create_extension_delete_query(mapping, values)
+            # dependent_query = self._create_extension_delete_query(mapping, values)
 
             # return dependent query executor to execute both queries
-            return DependentQueryExecutor(line_number, self.operation_type, mapping['table'], context, (query, values), dependent_query)
+            # return DependentQueryExecutor(line_number, self.operation_type, mapping.name, context, (query, values), dependent_query)
 
     def _create_non_unique_value_dict(self, mapping, row):
         # For deletes we don't need non-unique columns.
@@ -174,24 +172,25 @@ class DeleteOrmCreator(ExecutorCreator):
 
 
 class ExtensionValueHelper:
-    def get_extension_parameter_values(self, mapping, param):
+    def get_extension_parameter_values(self, mapping: Entity, param):
         # get extension foreign keys
-        extension_foreign_keys = [a['foreign-key'] for c in mapping['columns'] for a in c.get('attributes', []) if a.get('foreign-key', {}).get('extension')]
+        extension_foreign_keys = [a for a in mapping.attributes if isinstance(a, Reference) and a.extension]
 
         # only one extension is supported for now
         assert len(extension_foreign_keys) == 1, f'Only one extension is supported, found: {len(extension_foreign_keys)}'
         foreign_key = extension_foreign_keys[0]
 
         # foreign key must have a single attribute
-        assert len(foreign_key['attributes']) == 1, f'Foreign key must have a single attribute, found: {len(foreign_key["attributes"])}'
-        attribute = foreign_key['attributes'][0]
-        name_parameter_name = attribute['parameter']
+        assert len(foreign_key.attributes) == 1, f'Foreign key must have a single attribute, found: {len(foreign_key["attributes"])}'
+        attribute = foreign_key.attributes[0]
+        assert isinstance(attribute, Attribute), f'Foreign key attribute must be an attribute, found: {type(attribute)}'
+        name_parameter_name = attribute.parameter
 
-        table = foreign_key['table']
+        table = foreign_key.table
         name = param[name_parameter_name]
-        qualifier = foreign_key['qualifier']
+        qualifier = foreign_key.qualifier
         # TODO: replace with proper way to get the model name
-        model = mapping['table'].replace('_', '.')
+        model = mapping.name.replace('_', '.')
 
         # create values map
         values = {name_parameter_name: name, 'module': qualifier, 'model': model, 'res_id': None}

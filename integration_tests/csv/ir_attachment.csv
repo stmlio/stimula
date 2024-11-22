@@ -1,2 +1,2 @@
-guid[skip=true], name, res_id(name)[table=account_move: name=id: unique=true], res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]
+guid[skip=true], name, res_id(name)[table=account_move: target-name=id: unique=true], res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]
 abcdefgh, document_1.pdf, BNK1/2024/00001, account.move, , 1234567890

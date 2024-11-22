@@ -5,11 +5,12 @@ Author: Romke Jonker
 Email: romke@stml.io
 """
 import pandas as pd
+from sqlalchemy import select, func
 
-from stimula.compiler.alias_compiler import AliasCompiler
-from stimula.compiler.select_compiler import SelectCompiler
 from stimula.service.context import cnx_context, get_metadata
 from stimula.service.model_service import ModelService
+from stimula.stml.alias_enricher import AliasEnricher
+from stimula.stml.sql.select_renderer import SelectRenderer
 
 
 class PostgresModelService(ModelService):
@@ -47,6 +48,20 @@ class PostgresModelService(ModelService):
         foreign_column_name = foreign_key.column.name
         return foreign_table, foreign_column_name
 
+    def get_non_empty_columns(self, table):
+        # create list of column names
+        column_names = [c.name for c in table.columns]
+        # create column expressions
+        expr = select(*[func.bool_or(column.isnot(None)) for column in table.columns])
+        # execute query
+        cr = cnx_context.cr
+        cr.execute(str(expr))
+        result = cr.fetchone()
+        # zip and filter non-null columns
+        result = [c[0] for c in zip(column_names, result) if c[1]]
+        # return list
+        return result
+
     def read_table(self, mapping: dict, where_clause=None):
         # get sqlalchemy engine from context
         engine = cnx_context.engine
@@ -59,7 +74,7 @@ class PostgresModelService(ModelService):
 
     def _create_select_query(self, mapping, where_clause):
         # add aliases and parameter names
-        aliased_mapping = AliasCompiler().compile(mapping)
+        aliased_mapping = AliasEnricher().enrich(mapping)
 
         # translate syntax tree to select query
-        return SelectCompiler().compile(aliased_mapping, where_clause)
+        return SelectRenderer().render(aliased_mapping, where_clause)

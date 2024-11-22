@@ -23,5 +23,9 @@ class ModelService(ABC):
         pass
 
     @abstractmethod
+    def get_non_empty_columns(self, table):
+        pass
+
+    @abstractmethod
     def read_table(self, mapping: dict, where_clause=None):
         pass

@@ -17,7 +17,6 @@ def test_filtered_tables(books, db, context):
     assert tables == expected
 
 
-
 def test_get_table(db, books, cnx):
     df, _ = db.get_table('books', 'title[unique=true], authorid(name)')
     dtypes = {'title[unique=true]': 'string', 'authorid(name)': 'string'}
@@ -30,26 +29,6 @@ def test_get_table(db, books, cnx):
         ['War and Peace', 'Leo Tolstoy']
     ],
         columns=['title[unique=true]', 'authorid(name)']
-    ).astype(dtypes)
-
-    if not df.equals(expected):
-        print(df.compare(expected))
-
-    assert df.equals(expected)
-
-
-def test_get_table_split_column(db, books, cnx):
-    df, _ = db.get_table('books', 'title:authorid(name)')
-    dtypes = {'title:authorid(name)': 'string'}
-    expected = pd.DataFrame([
-        ['Emma:Jane Austen'],
-        ['War and Peace:Leo Tolstoy'],
-        ['Catch-22:Joseph Heller'],
-        ['David Copperfield:Charles Dickens'],
-        ['Good as Gold:Joseph Heller'],
-        ['Anna Karenina:Leo Tolstoy']
-    ],
-        columns=['title:authorid(name)']
     ).astype(dtypes)
 
     if not df.equals(expected):

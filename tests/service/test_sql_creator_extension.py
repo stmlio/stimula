@@ -1,9 +1,8 @@
 import pandas as pd
 
-from stimula.compiler.alias_compiler import AliasCompiler
-from stimula.compiler.model_compiler import ModelCompiler
-from stimula.header.stml_parser import StmlParser
 from stimula.service.sql_creator import InsertSqlCreator, UpdateSqlCreator, DeleteSqlCreator
+from stimula.stml.alias_enricher import AliasEnricher
+from stimula.stml.stml_parser import StmlParser
 
 '''
 This script tests sql creators for extension tables. An extension table is a table that is used to extend another table with additional attributes.
@@ -15,19 +14,19 @@ This script tests generating queries for inserts, updates, and deletes for the i
 '''
 
 
-def test_insert_sql_creator_external_id(books, model_compiler):
+def test_insert_sql_creator_external_id(books, model_enricher):
     # test that we can insert a record into an extension table
     table_name = 'books'
-    header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    header = 'title[unique=true], bookid(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_books]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [0, 'Pride and Prejudice', '12345'],
     ], columns=['__line__', 'title[unique=true]', 'bookid(name)'])
 
     # get queries
-    inserts = InsertSqlCreator().create_executors(mapping, diff)
-    actual = list(inserts)[0].queries()
+    inserts = list(InsertSqlCreator().create_executors(mapping, diff))
+    actual = inserts[0].queries()
 
     expected = [('insert into books(title) select :title returning books.id', {'name': '12345', 'title': 'Pride and Prejudice'}),
                 ('insert into ir_model_data (name, module, model, res_id) values (:name, :module, :model, :res_id)',
@@ -37,11 +36,11 @@ def test_insert_sql_creator_external_id(books, model_compiler):
     assert actual == expected
 
 
-def test_insert_sql_creator_external_id_unique(books, model_compiler, ir_model_data):
+def test_insert_sql_creator_external_id_unique(books, model_enricher, ir_model_data):
     # test that we can detect a required insert based on unique external id
     table_name = 'books'
-    header = 'title, bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books: unique=true]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    header = 'title, bookid(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_books: unique=true]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
 
     # 'Emma' exists, but with external id '11111'
     diff = pd.DataFrame([
@@ -60,19 +59,19 @@ def test_insert_sql_creator_external_id_unique(books, model_compiler, ir_model_d
     assert actual == expected
 
 
-def test_update_sql_creator_unmodified_external_id(books, model_compiler):
+def test_update_sql_creator_unmodified_external_id(books, model_enricher):
     # test we can update a record, even if there's an external id that is not marked as unique and was not modified
     table_name = 'books'
-    header = 'title[unique=true], authorid(name), bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    header = 'title[unique=true], authorid(name), bookid(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_books]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen'],
     ], columns=['__line__', ('title[unique=true]', ''), ('authorid(name)', 'self'), ('authorid(name)', 'other')])
 
     # get queries
-    updates = UpdateSqlCreator().create_executors(mapping, diff)
-    actual = list(updates)[0].queries()
+    updates = list(UpdateSqlCreator().create_executors(mapping, diff))
+    actual = updates[0].queries()
 
     expected = [('update books set authorid = authors.author_id from authors where books.title = :title and authors.name = :name', {'name': 'Joseph Heller', 'title': 'Pride and Prejudice'})]
 
@@ -80,11 +79,11 @@ def test_update_sql_creator_unmodified_external_id(books, model_compiler):
     assert actual == expected
 
 
-def test_update_sql_creator_unique_external_id(books, model_compiler):
+def test_update_sql_creator_unique_external_id(books, model_enricher):
     # test we can update a record, identified by external id
     table_name = 'books'
-    header = 'title, authorid(name), bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books: unique=true]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    header = 'title, authorid(name), bookid(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_books: unique=true]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [pd.Series([0]), 'Pride and Prejudice', 'Joseph Heller', 'Jane Austen', '11111'],
@@ -102,11 +101,11 @@ def test_update_sql_creator_unique_external_id(books, model_compiler):
     assert actual == expected
 
 
-def test_delete_sql_creator_external_id(books, model_compiler):
+def test_delete_sql_creator_external_id(books, model_enricher):
     # test that we can insert a record into an extension table
     table_name = 'books'
-    header = 'title[unique=true], bookid(name)[table=ir_model_data: name=res_id: qualifier=netsuite_books]'
-    mapping = AliasCompiler().compile(model_compiler.compile(StmlParser().parse_csv(table_name, header)))
+    header = 'title[unique=true], bookid(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_books]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
 
     diff = pd.DataFrame([
         [0, 'Pride and Prejudice', '12345'],

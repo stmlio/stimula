@@ -17,7 +17,7 @@ def test_auth():
 # make stimula believe it's in TTY mode, even though it's started from test runner
 @patch('sys.stdin.isatty', return_value=True)
 def test_post_single_file(mock_isatty):
-    call_main(f'stimula post -k {STIMULA_KEY} -t res_partner -f csv/res_partner.csv -IUC')
+    call_main(f'stimula post -k {STIMULA_KEY} -t res_partner -f csv/res_partner.csv -IUC -V')
 
 
 @patch('sys.stdin.isatty', return_value=True)
@@ -49,7 +49,7 @@ def _test_post_stml_file(mock_isatty):
 
 @patch('sys.stdin.isatty', return_value=True)
 def test_post_with_wildcard(mock_isatty):
-    paths = ' '.join(glob.glob('../demo/*.csv'))
+    paths = ' '.join(glob.glob('demo/face/*.csv'))
     call_main(f'stimula post -k {STIMULA_KEY} -f {paths} -IU -V')
 
 

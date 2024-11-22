@@ -1,13 +1,13 @@
-from stimula.header.stml_parser import StmlParser
+from stimula.stml.stml_parser import StmlParser
 from stimula.service.odoo.postgres_model_service import PostgresModelService
 
 
-def test_get_select_statement(books, db, model_compiler):
+def test_get_select_statement(books, db, model_enricher):
     table_name = 'books'
     header = 'title[unique=true], authorid(name)'
 
     # parse header to build mapping
-    mapping = model_compiler.compile(StmlParser().parse_csv(table_name, header))
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
 
     query = PostgresModelService()._create_select_query(mapping, None)
 

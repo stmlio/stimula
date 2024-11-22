@@ -3,10 +3,12 @@ ModelService implementation for Odoo JSON-RPC
 """
 import json
 from itertools import chain
+from typing import List
 
 import requests
 
 from stimula.service.model_service import ModelService
+from stimula.stml.model import Entity, AbstractAttribute, Attribute, Reference
 
 
 class JsonRpcModelService(ModelService):
@@ -39,25 +41,23 @@ class JsonRpcModelService(ModelService):
         foreign_column_name = 'id'
         return foreign_table, foreign_column_name
 
-    def read_table(self, mapping: dict, where_clause=None):
+    def get_non_empty_columns(self, table):
+        return []
+
+    def read_table(self, mapping: Entity, where_clause=None):
         # get model name
-        model = mapping['table']
+        model = mapping.name
 
         # read attribute values from the model
-        records = self._read_columns(model, mapping.get('columns', []))
+        records = self._read_columns(model, mapping.attributes)
 
         # convert each row from list of tuples to dictionary, skip unresolved foreign keys
         return [{f[1]: self._join_values(f[2]) for f in r if len(f) == 3} for r in records]
 
-    def _read_columns(self, model, columns):
-        # validate columns each have a single attribute, otherwise this approach fails
-        assert all(len(c.get('attributes', [])) == 1 for c in columns), "Each column must have exactly one attribute"
-
-        # list attributes
-        attributes = [c['attributes'][0] for c in columns]
+    def _read_columns(self, model, attributes: List[AbstractAttribute]):
 
         # get attribute names
-        fields = [a['name'] for a in attributes]
+        fields = [a.name for a in attributes]
 
         # perform search_read on the model
         records = self.client.execute_kw(model, 'search_read', [[]], {'fields': fields})
@@ -68,28 +68,29 @@ class JsonRpcModelService(ModelService):
         # return resolved records as list
         return records_resolved
 
-    def _resolve_foreign_key(self, records, attribute):
-        if not 'foreign-key' in attribute:
-            return [(r['id'], attribute['name'], [r[attribute['name']]]) for r in records]
+    def _resolve_foreign_key(self, records, attribute: AbstractAttribute):
+        if isinstance(attribute, Attribute):
+            return [(r['id'], attribute.name, [r[attribute.name]]) for r in records]
 
-        # get foreign key attribute name
-        fk = attribute['name']
+        if isinstance(attribute, Reference):
+            # get foreign key attribute name
+            fk = attribute.name
 
-        # list all unique foreign key ids
-        ids = list(set([r[fk][0] for r in records if r.get(fk)]))
-        if not ids:
-            return
+            # list all unique foreign key ids
+            ids = list(set([r[fk][0] for r in records if r.get(fk)]))
+            if not ids:
+                return
 
-        # read all foreign key values, recurse to resolve nested foreign keys. Join keys and values for nested foreign keys.
-        fk_records = self._read_attributes(attribute['foreign-key']['table'], attribute['foreign-key']['attributes'], ids)
+            # read all foreign key values, recurse to resolve nested foreign keys. Join keys and values for nested foreign keys.
+            fk_records = self._read_attributes(attribute.table, attribute.attributes, ids)
 
-        # create a dictionary of resolved foreign key records
-        fk_records_dict = {r[0]: r for r in fk_records}
+            # create a dictionary of resolved foreign key records
+            fk_records_dict = {r[0]: r for r in fk_records}
 
-        # return foreign key values
-        records_resolved = [self.create_fk_record(fk, fk_records_dict, r) for r in records]
+            # return foreign key values
+            records_resolved = [self.create_fk_record(fk, fk_records_dict, r) for r in records]
 
-        return records_resolved
+            return records_resolved
 
     def create_fk_record(self, fk, fk_records_dict, record):
         # get foreign key value
@@ -102,9 +103,9 @@ class JsonRpcModelService(ModelService):
         # return foreign key record
         return (record['id'], f'{fk}({fk_records_dict.get(record[fk][0])[1]})', fk_records_dict.get(record[fk][0])[2])
 
-    def _read_attributes(self, model, attributes, ids):
+    def _read_attributes(self, model, attributes: List[AbstractAttribute], ids):
         # get attribute names
-        fields = [a['name'] for a in attributes]
+        fields = [a.name for a in attributes]
 
         # perform search_read on the model
         records = self.client.execute_kw(model, 'search_read', [[['id', 'in', ids]]], {'fields': fields})
