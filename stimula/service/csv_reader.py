@@ -259,7 +259,7 @@ class CsvReader:
                 expression = f"{column_name}={attribute.exp}"
 
                 # evaluate the expression, pass custom functions
-                df.eval(expression, inplace=True, local_dict={'checksum': checksum, 'base64encode': base64encode, 'concat': concat})
+                df.eval(expression, inplace=True, local_dict={'checksum': checksum, 'base64encode': base64encode, 'concat': concat, 'fallback': fallback})
 
         # restore column names
         df.columns = original_column_names
@@ -371,10 +371,24 @@ def _base64encode(x: str | bytes | None) -> str | None:
 
 
 def concat(*series):
-    # concat function for custom expression. Return concatenated string for all items in series an return as type string.
-    return pd.Series(list(zip(*series))).apply(_concat).astype('string')
+    # concat function for custom expression. Return concatenated string for all items in series. Return as type 'string'.
+    sep = series[0] or ''
+    enc = '"' if bool(series[1]) else ''
+    return pd.Series(list(zip(*series[2:]))).apply(lambda s: _concat(sep, enc, s)).astype('string')
 
 
-# a concat function that accepts any number of arguments and returns a concatenated string
-def _concat(args):
-    return ':'.join('"' + str(arg) + '"' for arg in args)
+# a concat function that accepts 1+ arguments and returns a concatenated string, using first parameter as separator. If second parameter is true, then enclose in quotes
+def _concat(sep, enc, series):
+    # concatenate non-empty items in series, using sep as separator and dec as enclosure
+    return sep.join(enc + str(s) + enc for s in series if not pd.isna(s) and not s == '') or ''
+
+def fallback(*series):
+    # takes any number of values and returns the first non-null and non-empty value
+    return pd.Series(list(zip(*series))).apply(_fallback).astype('string')
+
+def _fallback(args):
+    for arg in args:
+        if not pd.isna(arg) and not arg == '':
+            return arg
+    return ''
+

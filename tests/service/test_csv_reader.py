@@ -115,3 +115,51 @@ def _find_file(folder, file):
         if file in files:
             return os.path.join(root, file)
     raise FileNotFoundError(f"Could not find {file}")
+
+
+def test_concat():
+    # test that the @concat function decorates and concatenates values
+    table_name = 'any'
+    header = 'a, b, c, "xyz[exp=""@concat(\':\', True, a, b, c)""]"'
+    mapping = StmlParser().parse_csv(table_name, header)
+    body = '''
+        a, b, c,
+         , b, c,
+         ,  , c,
+         ,  ,  ,
+    '''
+
+    df = csv_reader.read_from_request(mapping, body, 0)
+
+    expected = [
+        [0, 'a', 'b', 'c', '"a":"b":"c"'],
+        [1, '', 'b', 'c', '"b":"c"'],
+        [2, '', '', 'c', '"c"'],
+        [3, '', '', '', ''],
+    ]
+
+    assert df.values.tolist() == expected
+
+
+def test_fallback():
+    # test that the @fallback function falls back to the first non-empty value
+    table_name = 'any'
+    header = 'a, b, c, "xyz[exp=""@fallback(a, b, c)""]"'
+    mapping = StmlParser().parse_csv(table_name, header)
+    body = '''
+        a, b, c,
+         , b, c,
+         ,  , c,
+         ,  ,  ,
+    '''
+
+    df = csv_reader.read_from_request(mapping, body, 0)
+
+    expected = [
+        [0, 'a', 'b', 'c', 'a'],
+        [1, '', 'b', 'c', 'b'],
+        [2, '', '', 'c', 'c'],
+        [3, '', '', '', ''],
+    ]
+
+    assert df.values.tolist() == expected
