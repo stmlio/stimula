@@ -95,12 +95,12 @@ def test_post_script(db):
 
 def test_create_substitutions_map():
     csv = '''\
-    domain, name, synonym
+    domain, name, substition
     Color,	White, White
-    Color,	White, Weiß
-    Color,	White, Blanc
-    Size,	S/M,   Small/Medium
-    Size,	L,	   Large
+    Color,	Weiß, White 
+    Color,	Blanc, White
+    Size,	Small/Medium, S/M
+    Size,	Large, L
     Size,10,10
     '''
     map = csv_reader._create_substitutions_map(csv)

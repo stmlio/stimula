@@ -322,9 +322,9 @@ class CsvReader:
         # convert to dictionary, first column is the domain
         map = {row.strip().lower(): {} for row in df_substitutions.iloc[:, 0].unique()}
 
-        # iterate rows, second column is the name, third column is the synonym
+        # iterate rows, second column is the name, third column is the substitution for the name
         for row in df_substitutions.itertuples(index=False):
-            map[row[0].strip().lower()][row[2].strip().lower()] = row[1].strip()
+            map[row[0].strip().lower()][row[1].strip().lower()] = row[2].strip()
 
         return map
 
