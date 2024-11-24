@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ExecutorService:
-    def execute_sql(self, query_executors, execute, commit):
+    def execute_sql(self, query_executors, execute, commit, tx_size=1000):
         if not execute:
             # fake execution, return result
             return [qe.fake_execute() for qe in query_executors]
@@ -23,11 +23,10 @@ class ExecutorService:
         cr = cnx_context.cr
 
         # execute queries, rerun until exhausted
-        result = self._eat_sleep_repeat(query_executors, cr)
+        result = self._eat_sleep_repeat(query_executors, cr, commit, tx_size)
 
         # commit if requested
         if commit:
-            cnx_context.cnx.commit()
 
             # registry may not be available during unit tests
             if hasattr(cnx_context, 'registry'):
@@ -40,7 +39,7 @@ class ExecutorService:
 
         return result
 
-    def _eat_sleep_repeat(self, query_executors, cr):
+    def _eat_sleep_repeat(self, query_executors, cr, commit, tx_size):
         # execute in rounds until no new successful queries are found
 
         # create result lists
@@ -51,6 +50,7 @@ class ExecutorService:
         remaining = query_executors.copy()
 
         done = False
+        tx_count = 0
 
         while not done:
             new_completed_executors = []
@@ -67,6 +67,17 @@ class ExecutorService:
                     new_completed_results.append(execution_result)
                     # remove from remaining
                     new_completed_executors.append(query_executor)
+                    # increment tx count
+                    tx_count += 1
+                    if tx_count >= tx_size:
+                        # commit transaction
+                        if commit:
+                            cnx_context.cnx.commit()
+                        else:
+                            # rollback all queries
+                            cnx_context.cnx.rollback()
+                        # reset tx count
+                        tx_count = 0
                 else:
                     # rollback to savepoint
                     self.rollback_to_savepoint()
@@ -82,6 +93,10 @@ class ExecutorService:
             else:
                 # nothing new completed, we're done
                 done = True
+                # commit if transactions remain
+                if tx_count > 0 and commit:
+                    cnx_context.cnx.commit()
+
         # combine completed and failed lists
         all_results = completed + failed
 
