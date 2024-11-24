@@ -114,3 +114,19 @@ def test_extension_unique(books, model_enricher, context, ir_model_data):
     result = UpdateRenderer().render(mapping)
     expected = "update books set title = :title from ir_model_data where books.bookid = ir_model_data.res_id and ir_model_data.name = :name and ir_model_data.module = 'netsuite_books' and ir_model_data.model = 'books'"
     assert result == expected
+
+def test_update_json_field(books, model_enricher):
+    table_name = 'properties'
+    header = 'name[unique=true], jsonb[key=en_US]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = UpdateRenderer().render(mapping)
+    expected = "update properties set jsonb = jsonb_set(jsonb, '{en_US}', to_jsonb(:jsonb::text)) where properties.name = :name"
+    assert result == expected
+
+def test_update_where_json_field(books, model_enricher):
+    table_name = 'properties'
+    header = 'name, jsonb[key=en_US: unique=true]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = UpdateRenderer().render(mapping)
+    expected = "update properties set name = :name where properties.jsonb->>'en_US' = :jsonb"
+    assert result == expected

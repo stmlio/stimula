@@ -99,3 +99,11 @@ def test_extension_in_foreign_table(books, model_enricher, context, ir_model_dat
                 "and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' "
                 "where ir_model_data.name = :name")
     assert result == expected
+
+def test_insert_json_field(books, model_enricher):
+    table_name = 'properties'
+    header = 'name[unique=true], jsonb[key=en_US]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = InsertRenderer().render(mapping)
+    expected = "insert into properties(name, jsonb) select :name, jsonb_build_object('en_US', :jsonb)"
+    assert result == expected

@@ -35,6 +35,11 @@ class WhereClauseRenderer:
     def _attribute(self, attribute: AbstractAttribute, alias):
         if isinstance(attribute, Attribute):
             parameter_name = attribute.parameter or attribute.name
+
+            # if there's a key, then address field in json object
+            if attribute.key:
+                return [f"{alias}.{attribute.name}->>'{attribute.key}' = :{parameter_name}"]
+
             return [f'{alias}.{attribute.name} = :{parameter_name}']
 
         if self._is_primary_key_selector:
