@@ -138,7 +138,7 @@ class StmlCreator:
         if not column.foreign_keys:
             return Attribute(column.name, type=str(column.type).lower())
         else:
-            return self._foreign_key(column.foreign_keys)
+            return self._foreign_key(column)
 
     def _sort_columns(self, attributes: List[AbstractAttribute]) -> List[AbstractAttribute]:
         # get primary key columns
