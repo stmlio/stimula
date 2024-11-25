@@ -188,7 +188,7 @@ class DB:
         return Reporter().create_post_report([table_name], [body], [context], execution_results, execute, commit, skiprows)
 
     def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
-                                             post_script=None, context=None):
+                                             post_script=None, context=None, substitutions=None):
         assert len(table_names) == len(contents), f"Provide exactly one file for each table name, so {len(table_names)}, not {len(contents)}"
         assert header is None, "Header must be None when posting multiple tables"
         assert skiprows == 1, "Skiprows must be 1 when posting multiple tables"
@@ -204,12 +204,13 @@ class DB:
         for table_name, file_context, content in zip(table_names, context, contents):
             # decode binary content
             text_content = content.decode('utf-8')
+            text_substitutions = substitutions.decode('utf-8') if substitutions else None
 
             # get header from first line
             header = text_content.split('\n', 1)[0]
 
             # create diffs and sql
-            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, post_script, file_context, orm=orm)
+            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, post_script, file_context, orm=orm, substitutions=text_substitutions)
             query_executors.extend(qe)
 
         # execute sql statements

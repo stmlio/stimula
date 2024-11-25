@@ -76,7 +76,8 @@ class Invoker:
 
         assert len(tables) == len(files), "Provide exactly one file per table, not %s" % len(files)
 
-        if len(files) == 1:
+        # post single file if there's only one table and no substitutions
+        if len(files) == 1 and len(substitutions) == 0:
             # post single file from disk or stdin
             path = f"tables/{tables[0]}"
 
@@ -96,6 +97,10 @@ class Invoker:
 
             # zip table names and files to create file dictionary for post request. Make sure the keys are unique
             file_map = {f'file{suffix}': (file_name, file, 'text/csv') for suffix, file_name, file in zip(range(len(files)), context, files)}
+
+            if len(substitutions) == 1:
+                # add substitutions files
+                file_map['substitutions'] = ('substitutions.csv', substitutions[0], 'text/csv')
 
             # return the token from json response
             return self.post_multi(path, params, files=file_map).json()
