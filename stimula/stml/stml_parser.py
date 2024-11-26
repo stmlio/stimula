@@ -47,7 +47,7 @@ class StmlLexer(Lexer):
 
     # Regular expression rules for tokens
     ID = r'[a-zA-Z_][a-zA-Z0-9_-]*'
-    VALUE = r'[a-zA-Z0-9_$]+'
+    VALUE = r'[a-zA-Z0-9_${}]+'
     QUOTED_VALUE = r'"[^\"]+"'
     COLON = r'\:'
     EQUALS = r'\='

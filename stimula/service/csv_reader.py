@@ -17,9 +17,7 @@ _logger = logging.getLogger(__name__)
 
 
 class CsvReader:
-    def read_from_request(self, mapping, body, skiprows, post_script=None, substitutions=None):
-        # prepare substitutions map
-        substitutions_map = self._create_substitutions_map(substitutions)
+    def read_from_request(self, mapping, body, skiprows, post_script=None, substitutions_map=None):
 
         # get columns and unique columns. Include all columns, including skip and orm-only columns.
         column_names = HeaderRenderer().render_list(mapping, include_skip=True, include_orm_only=True)
@@ -310,24 +308,6 @@ class CsvReader:
         # execute the post script
         return module.execute(df)
 
-    def _create_substitutions_map(self, substitutions):
-        # convert substitutions table into a dictionary
-        if not substitutions:
-            # return None to indicate no substitutions were provided
-            return None
-
-        # read substitutions from binary string into a DataFrame
-        df_substitutions = pd.read_csv(StringIO(substitutions), dtype=str, na_filter=False)
-
-        # convert to dictionary, first column is the domain
-        map = {row.strip().lower(): {} for row in df_substitutions.iloc[:, 0].unique()}
-
-        # iterate rows, second column is the name, third column is the substitution for the name
-        for row in df_substitutions.itertuples(index=False):
-            map[row[0].strip().lower()][row[1].strip().lower()] = row[2].strip()
-
-        return map
-
 
 def checksum(series):
     # checksum function for custom expression. Return hex digest for all items in series an return as type string.
@@ -382,13 +362,14 @@ def _concat(sep, enc, series):
     # concatenate non-empty items in series, using sep as separator and dec as enclosure
     return sep.join(enc + str(s) + enc for s in series if not pd.isna(s) and not s == '') or ''
 
+
 def fallback(*series):
     # takes any number of values and returns the first non-null and non-empty value
     return pd.Series(list(zip(*series))).apply(_fallback).astype('string')
+
 
 def _fallback(args):
     for arg in args:
         if not pd.isna(arg) and not arg == '':
             return arg
     return ''
-

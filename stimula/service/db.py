@@ -6,6 +6,7 @@ Email: romke@rnadesign.net
 """
 import logging
 import re
+from io import StringIO
 from typing import Optional
 
 import pandas as pd
@@ -25,6 +26,7 @@ from ..stml.header_renderer import HeaderRenderer
 from ..stml.json_renderer import JsonRenderer
 from ..stml.model import Entity
 from ..stml.model_enricher import ModelEnricher
+from ..stml.parameter_expander import ParameterExpander
 from ..stml.sql.select_renderer import SelectRenderer
 from ..stml.sql.types_renderer import TypesRenderer
 from ..stml.stml_creator import StmlCreator
@@ -255,9 +257,7 @@ class DB:
     def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
         pass
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None, substitutions=None):
-        # get cnx from context
-        cnx = cnx_context.cnx
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None, substitutions: str=None):
 
         # if header is empty and skiprows is 1, then take the first line as header
         if not header and skiprows == 1:
@@ -270,17 +270,29 @@ class DB:
         # parse header to build syntax tree
         mapping = ModelEnricher(PostgresModelService()).enrich(StmlParser().parse_csv(table_name, header))
 
-        # read dataframe from request first, so we can give feedback on errors in the request
-        df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script, substitutions)
+        # prepare substitutions map
+        substitutions_map = self._create_substitutions_map(substitutions)
 
-        # read dataframe from DB
-        df_db = DbReader().read_from_db(mapping, where_clause, set_index=True)
+        # expand parameter placeholders
+        mappings = ParameterExpander().expand(mapping, substitutions_map)
 
-        # compare to obtain diff
-        diffs = self._compare(df_request, df_db, insert, update, delete)
+        diffs = None
+        sqls = []
 
-        # create sql statements and parameters
-        sqls = self._diff_to_sql.diff_executor(mapping, diffs, context, orm)
+        # iterate over mappings
+        for mapping in mappings:
+
+            # read dataframe from request first, so we can give feedback on errors in the request
+            df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script, substitutions)
+
+            # read dataframe from DB
+            df_db = DbReader().read_from_db(mapping, where_clause, set_index=True)
+
+            # todo: remove the need to return diffs
+            diffs = self._compare(df_request, df_db, insert, update, delete)
+
+            # create sql statements and parameters
+            sqls.extend(self._diff_to_sql.diff_executor(mapping, diffs, context, orm))
 
         return diffs, sqls
 
@@ -430,3 +442,21 @@ class DB:
         result_columns.extend(unselected_columns)
 
         return result_columns
+
+    def _create_substitutions_map(self, substitutions):
+        # convert substitutions table into a dictionary
+        if not substitutions:
+            # return None to indicate no substitutions were provided
+            return None
+
+        # read substitutions from binary string into a DataFrame
+        df_substitutions = pd.read_csv(StringIO(substitutions), dtype=str, na_filter=False)
+
+        # convert to dictionary, first column is the domain
+        map = {row.strip().lower(): {} for row in df_substitutions.iloc[:, 0].unique()}
+
+        # iterate rows, second column is the name, third column is the substitution for the name
+        for row in df_substitutions.itertuples(index=False):
+            map[row[0].strip().lower()][row[1].strip().lower()] = row[2].strip()
+
+        return map

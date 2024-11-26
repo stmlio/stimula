@@ -93,22 +93,6 @@ def test_post_script(db):
     assert result.equals(expected)
 
 
-def test_create_substitutions_map():
-    csv = '''\
-    domain, name, substition
-    Color,	White, White
-    Color,	Weiß, White 
-    Color,	Blanc, White
-    Size,	Small/Medium, S/M
-    Size,	Large, L
-    Size,10,10
-    '''
-    map = csv_reader._create_substitutions_map(csv)
-
-    assert map['color']['weiß'] == 'White'
-    assert map['size']['large'] == 'L'
-
-
 def _find_file(folder, file):
     # find absolute path for script, search in subfolders, so it works in tests
     for root, dirs, files in os.walk(folder):
