@@ -1,6 +1,6 @@
-from stimula.stml.stml_parser import StmlParser
 from stimula.stml.alias_enricher import AliasEnricher
 from stimula.stml.sql.update_renderer import UpdateRenderer
+from stimula.stml.stml_parser import StmlParser
 
 
 def test_simple_query(books, model_enricher, context):
@@ -115,6 +115,7 @@ def test_extension_unique(books, model_enricher, context, ir_model_data):
     expected = "update books set title = :title from ir_model_data where books.bookid = ir_model_data.res_id and ir_model_data.name = :name and ir_model_data.module = 'netsuite_books' and ir_model_data.model = 'books'"
     assert result == expected
 
+
 def test_update_json_field(books, model_enricher):
     table_name = 'properties'
     header = 'name[unique=true], jsonb[key=en_US]'
@@ -123,6 +124,7 @@ def test_update_json_field(books, model_enricher):
     expected = "update properties set jsonb = jsonb_set(jsonb, '{en_US}', to_jsonb(:jsonb::text)) where properties.name = :name"
     assert result == expected
 
+
 def test_update_where_json_field(books, model_enricher):
     table_name = 'properties'
     header = 'name, jsonb[key=en_US: unique=true]'
@@ -130,3 +132,15 @@ def test_update_where_json_field(books, model_enricher):
     result = UpdateRenderer().render(mapping)
     expected = "update properties set name = :name where properties.jsonb->>'en_US' = :jsonb"
     assert result == expected
+
+def test_update_with_filter_clause(books, model_enricher, context):
+    # tests that UpdateRenderer can retrict un update query by a filter clause on a non-unique column.
+    # it should ignore a filter on a unique attribute, because that's already restricted by the parameter
+    table_name = 'books'
+    header = 'title[unique=true: filter="$ like \'abc%\'"], price[filter="$ > 10"]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = UpdateRenderer().render(mapping)
+    expected = 'update books set price = :price where books.title = :title and books.price > 10'
+    assert result == expected
+
+
