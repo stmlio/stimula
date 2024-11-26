@@ -283,7 +283,7 @@ class DB:
         for mapping in mappings:
 
             # read dataframe from request first, so we can give feedback on errors in the request
-            df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script, substitutions)
+            df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script, substitutions_map)
 
             # read dataframe from DB
             df_db = DbReader().read_from_db(mapping, where_clause, set_index=True)
