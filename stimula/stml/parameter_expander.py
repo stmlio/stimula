@@ -10,7 +10,6 @@ import itertools
 import re
 from itertools import chain
 
-from build.lib.stimula.stml.model import AbstractAttribute
 from stimula.stml.model import Entity, Attribute, Reference
 
 
