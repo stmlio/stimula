@@ -172,10 +172,6 @@ class StmlParser(Parser):
 
         return {key: value}
 
-    @_('')
-    def empty(self, p):
-        pass
-
     def _fix_modifier_names(self, modifiers):
         return {k.replace('-', '_'): v for k, v in modifiers.items()}
 
