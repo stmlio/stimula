@@ -281,7 +281,7 @@ def _substitute(substitutions, domain, value):
         return None
 
     # get the substitution value, fallback on the original value
-    substitution = substitutions.get(domain.lower(), {}).get(value.lower(), value)
+    substitution = substitutions.get(domain, {}).get(value, value)
 
     # return the substitution value
     return substitution
