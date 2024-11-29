@@ -1,18 +1,15 @@
-import sys
-
-from stimula.service.abstract_orm import AbstractORM
-from stimula.service.odoo.jsonrpc_model_service import JsonRpcClient, JsonRpcModelService
-from stimula.service.odoo.postgres_model_service import PostgresModelService
-from stimula.stml.model_enricher import ModelEnricher
-
 import os
 
 import psycopg2
 import pytest
 from sqlalchemy import (create_engine, MetaData)
 
+from stimula.cli.local import MuteORM
 from stimula.service.auth import Auth
 from stimula.service.db import DB, cnx_context
+from stimula.service.odoo.jsonrpc_model_service import JsonRpcClient, JsonRpcModelService
+from stimula.service.odoo.postgres_model_service import PostgresModelService
+from stimula.stml.model_enricher import ModelEnricher
 
 
 class TestAuth(Auth):
@@ -25,20 +22,6 @@ class TestAuth(Auth):
     def _validate_token_credentials(self, database, username, password):
         # return cnx, cr for caller to unpack
         return None, None
-
-
-class TestORM(AbstractORM):
-    def create(self, model_name: str, values: dict):
-        pass
-
-    def read(self, model_name: str, record_id: int):
-        pass
-
-    def update(self, model_name: str, record_id: int, values: dict):
-        pass
-
-    def delete(self, model_name: str, record_id: int):
-        pass
 
 
 @pytest.fixture
@@ -276,7 +259,7 @@ def test_table(cnx):
 
 @pytest.fixture
 def orm():
-    return TestORM()
+    return MuteORM()
 
 
 @pytest.fixture

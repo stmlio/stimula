@@ -10,17 +10,17 @@ import jwt
 import psycopg2
 from sqlalchemy import create_engine
 
+from stimula.service.abstract_orm import AbstractORM
 from stimula.service.auth import Auth
 from stimula.service.context import cnx_context
 from stimula.service.db import DB
-from tests.conftest import TestORM
 
 
 class Invoker:
     def __init__(self, secret_key, host, port):
         # for local client, the secret key does not depend on the database but is specified by the user
         self._auth = LocalAuth(lambda database: secret_key, host, port)
-        self._db = DB(lambda: TestORM())
+        self._db = DB(lambda: MuteORM())
 
     def set_context(self, token):
         # set context for processing of this request
@@ -108,3 +108,16 @@ class LocalAuth(Auth):
 
         # return connection and cursor objects. With psycopg2, it's best to re-use the connection and cursor objects
         return cnx, cr
+
+class MuteORM(AbstractORM):
+    def create(self, model_name: str, values: dict):
+        pass
+
+    def read(self, model_name: str, record_id: int):
+        pass
+
+    def update(self, model_name: str, record_id: int, values: dict):
+        pass
+
+    def delete(self, model_name: str, record_id: int):
+        pass
