@@ -267,7 +267,7 @@ class CsvReader:
             df.set_index(index_columns, inplace=True)
 
         # list all columns with 'skip=true' in their mapping, but not API results. Assume single attribute.
-        drop_column_names = [n for n, a in zip(column_names, mapping.attributes) if a and a.skip and not a.api]
+        drop_column_names = [n for n, a in zip(column_names, mapping.attributes) if a and a.skip and not (isinstance(a, Attribute) and a.api)]
 
         # drop these columns, because we've evaluated expressions so we no longer need them. But keep API results, we'll use them later.
         df.drop(columns=drop_column_names, errors='ignore', inplace=True)
