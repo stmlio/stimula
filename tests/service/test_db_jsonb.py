@@ -302,9 +302,9 @@ def test_json_default_value(db, context, cnx):
 def test_update_json(books, db, context, cnx):
     # test that DB can update json
     jsonb_data = {'key 1': 'value 1'}
-    with cnx.cursor() as cr:
+    with cnx.cursor() as cursor:
         # insert row into properties
-        cr.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('name 1', json.dumps(jsonb_data)))
+        cursor.execute("INSERT INTO properties (name, jsonb) VALUES (%s, %s)", ('name 1', json.dumps(jsonb_data)))
         # commit
         cnx.commit()
 
@@ -317,7 +317,7 @@ def test_update_json(books, db, context, cnx):
     # post jsonb
     result = db.post_table_get_sql('properties', header, None, body, update=True, execute=True)
 
-    expected = "update properties set jsonb = jsonb_set(jsonb, '{key 1}', to_jsonb(:jsonb::text)) where properties.name = :name"
+    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{key 1}', to_jsonb(:jsonb::text)) where properties.name = :name"
 
     assert (result.values[0] == [1, None, expected, 'name 1', 'value 2']).all()
 

@@ -35,16 +35,17 @@ class UpdateClauseRenderer:
     def render(self, mapping: Entity):
 
         # can't update unique columns
-        clauses = [self._attribute(a) for a in mapping.attributes if not a.unique]
+        clauses = [self._attribute(a, mapping.name) for a in mapping.attributes if not a.unique]
 
         # comma separate cells
         return f'update {mapping.name} set ' + ', '.join(clauses)
 
-    def _attribute(self, attribute: AbstractAttribute):
+    def _attribute(self, attribute: AbstractAttribute, table_name: str):
         if isinstance(attribute, Attribute):
             # if key is set, then update json field
             if attribute.key:
-                return f"{attribute.name} = jsonb_set({attribute.name}, '{{{attribute.key}}}', to_jsonb(:{attribute.parameter}::text))"
+                # use table_name to disambiguate input for jsonb_set
+                return f"{attribute.name} = jsonb_set({table_name}.{attribute.name}, '{{{attribute.key}}}', to_jsonb(:{attribute.parameter}::text))"
 
             return f'{attribute.name} = :{attribute.parameter}'
 

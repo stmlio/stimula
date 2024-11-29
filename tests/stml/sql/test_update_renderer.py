@@ -121,7 +121,23 @@ def test_update_json_field(books, model_enricher):
     header = 'name[unique=true], jsonb[key=en_US]'
     mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
     result = UpdateRenderer().render(mapping)
-    expected = "update properties set jsonb = jsonb_set(jsonb, '{en_US}', to_jsonb(:jsonb::text)) where properties.name = :name"
+    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{en_US}', to_jsonb(:jsonb::text)) where properties.name = :name"
+    assert result == expected
+
+
+def test_update_ambiguous_json_field(books, cnx, model_enricher):
+    # test that the update query can handle a json field that appears in multiple tables
+    with cnx.cursor() as cursor:
+        # update properties table to add a foreign key into itself
+        cursor.execute("ALTER TABLE properties ADD COLUMN propertyid INTEGER")
+        cursor.execute("ALTER TABLE properties ADD CONSTRAINT fk_properties_properties FOREIGN KEY (propertyid) REFERENCES properties(property_id)")
+    cnx.commit()
+
+    table_name = 'properties'
+    header = 'name[unique=true], jsonb[key=en_US], propertyid(jsonb[key=en_US])'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = UpdateRenderer().render(mapping)
+    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{en_US}', to_jsonb(:jsonb::text)), propertyid = properties_1.property_id from properties as properties_1 where properties.name = :name and properties_1.jsonb->>'en_US' = :jsonb_1"
     assert result == expected
 
 
@@ -133,6 +149,7 @@ def test_update_where_json_field(books, model_enricher):
     expected = "update properties set name = :name where properties.jsonb->>'en_US' = :jsonb"
     assert result == expected
 
+
 def test_update_with_filter_clause(books, model_enricher, context):
     # tests that UpdateRenderer can retrict un update query by a filter clause on a non-unique column.
     # it should ignore a filter on a unique attribute, because that's already restricted by the parameter
@@ -142,5 +159,3 @@ def test_update_with_filter_clause(books, model_enricher, context):
     result = UpdateRenderer().render(mapping)
     expected = 'update books set price = :price where books.title = :title and books.price > 10'
     assert result == expected
-
-
