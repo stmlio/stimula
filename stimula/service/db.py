@@ -453,10 +453,10 @@ class DB:
         df_substitutions = pd.read_csv(StringIO(substitutions), dtype=str, na_filter=False)
 
         # convert to dictionary, first column is the domain
-        map = {row.strip().lower(): {} for row in df_substitutions.iloc[:, 0].unique()}
+        map = {row.strip(): {} for row in df_substitutions.iloc[:, 0].unique()}
 
         # iterate rows, second column is the name, third column is the substitution for the name
         for row in df_substitutions.itertuples(index=False):
-            map[row[0].strip().lower()][row[1].strip().lower()] = row[2].strip()
+            map[row[0].strip()][row[1].strip()] = row[2].strip()
 
         return map

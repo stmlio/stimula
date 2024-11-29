@@ -13,5 +13,5 @@ def test_create_substitutions_map():
     '''
     map = DB()._create_substitutions_map(csv)
 
-    assert map['color']['weiß'] == 'White'
-    assert map['size']['large'] == 'L'
+    assert map['Color']['Weiß'] == 'White'
+    assert map['Size']['Large'] == 'L'
