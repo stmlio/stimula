@@ -30,7 +30,7 @@ class Entity:
 
 class AbstractAttribute(ABC):
     def __init__(self, name: str, unique: bool, skip: bool, exp: str, default_value: str, orm_only: bool, enabled: bool, primary_key: bool, in_use: bool, default: bool, deduplicate: bool,
-                 substitute: str) -> None:
+                 substitute: str, key: str) -> None:
         self.name: str = name
         self.unique: bool = unique
         self.skip: bool = skip
@@ -43,10 +43,11 @@ class AbstractAttribute(ABC):
         self.default: bool = default
         self.deduplicate: bool = deduplicate
         self.substitute: str = substitute
+        self.key: str = key
 
     def to_dict(self) -> Dict[str, any]:
         data = {"name": self.name, 'unique': self.unique, 'skip': self.skip, 'exp': self.exp, 'default_value': self.default_value, 'orm_only': self.orm_only, 'enabled': self.enabled,
-                'primary_key': self.primary_key, 'in_use': self.in_use, 'default': self.default, 'deduplicate': self.deduplicate, 'substitute': self.substitute}
+                'primary_key': self.primary_key, 'in_use': self.in_use, 'default': self.default, 'deduplicate': self.deduplicate, 'substitute': self.substitute, 'key': self.key}
         return {key: value for key, value in data.items() if value}
 
     def __repr__(self) -> str:
@@ -67,15 +68,15 @@ class AbstractAttribute(ABC):
             and self.in_use == other.in_use \
             and self.default == other.default \
             and self.deduplicate == other.deduplicate \
-            and self.substitute == other.substitute
+            and self.substitute == other.substitute \
+            and self.key == other.key
 
 
 class Attribute(AbstractAttribute):
     def __init__(self, name: str, unique=False, skip=False, exp='', default_value=None, orm_only=False, enabled: bool = False, primary_key: bool = False, in_use: bool = False, default: bool = False,
                  deduplicate: bool = False, substitute: str = None,
                  key: str = None, type: str = None, parameter: str = None, filter: str = None, api: str = None, url: str = None) -> None:
-        super().__init__(name, unique, skip, exp, default_value, orm_only, enabled, primary_key, in_use, default, deduplicate, substitute)
-        self.key: str = key
+        super().__init__(name, unique, skip, exp, default_value, orm_only, enabled, primary_key, in_use, default, deduplicate, substitute, key)
         self.type: str = type
         self.parameter: str = parameter
         self.filter: str = filter
@@ -83,7 +84,7 @@ class Attribute(AbstractAttribute):
         self.url: str = url
 
     def to_dict(self) -> Dict[str, any]:
-        data = super().to_dict() | {"key": self.key, "type": self.type, "parameter": self.parameter, "filter": self.filter, "api": self.api, "url": self.url}
+        data = super().to_dict() | {"type": self.type, "parameter": self.parameter, "filter": self.filter, "api": self.api, "url": self.url}
         return {key: value for key, value in data.items() if value}
 
     def __eq__(self, other: object) -> bool:
@@ -91,7 +92,6 @@ class Attribute(AbstractAttribute):
         if not isinstance(other, Attribute):
             return False
         return super().__eq__(other) \
-            and _none_safe_compare(self.key, other.key) \
             and _none_safe_compare(self.type, other.type) \
             and _none_safe_compare(self.parameter, other.parameter) \
             and _none_safe_compare(self.filter, other.filter) \
@@ -101,9 +101,9 @@ class Attribute(AbstractAttribute):
 
 class Reference(AbstractAttribute):
     def __init__(self, name: str, attributes: List['AbstractAttribute'] = [], unique: bool = False, skip: bool = False, exp: str = '', default_value: str = None, orm_only: bool = False,
-                 enabled: bool = False, primary_key: bool = False, in_use: bool = False, default: bool = False, deduplicate: bool = False, substitute: str = None,
+                 enabled: bool = False, primary_key: bool = False, in_use: bool = False, default: bool = False, deduplicate: bool = False, substitute: str = None, key: str = None,
                  table: str = None, target_name: str = None, qualifier: str = None, extension: bool = False, alias: str = None, id: str = None) -> None:
-        super().__init__(name, unique, skip, exp, default_value, orm_only, enabled, primary_key, in_use, default, deduplicate, substitute)
+        super().__init__(name, unique, skip, exp, default_value, orm_only, enabled, primary_key, in_use, default, deduplicate, substitute, key)
         self.attributes: List[AbstractAttribute] = attributes
         self.table = table
         self.target_name = target_name
