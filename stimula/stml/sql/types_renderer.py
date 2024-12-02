@@ -18,7 +18,8 @@ from itertools import chain
 import numpy as np
 import pandas as pd
 
-from stimula.stml.model import Entity, AbstractAttribute, Attribute, Reference
+from stimula.stml.model import AbstractAttribute, Attribute, Reference
+
 
 class TypesRenderer:
 
@@ -272,19 +273,30 @@ def default_value_converter(dtype, default):
 def _set_default_value(value, default):
     return value if value is not None and value != '' and not (isinstance(value, (float, np.float64)) and np.isnan(value)) else default
 
+
 def _substitute_converter(substitutions, domain):
     return lambda value: _substitute(substitutions, domain, value)
+
 
 def _substitute(substitutions, domain, value):
     # return None for empty values
     if value is None:
         return None
 
-    # get the substitution value, fallback on the original value
-    substitution = substitutions.get(domain, {}).get(value, value)
+    # if domain doesn't exist, then throw an error
+    assert domain in substitutions, f"Domain '{domain}' not found in substitutions"
 
-    # return the substitution value
-    return substitution
+    # find a full match
+    if value in substitutions[domain]:
+        return substitutions[domain][value]
+
+    # then try regular expressions
+    for key, substitution in substitutions[domain].items():
+        if re.match(key, value):
+            return substitution
+
+    # else return original value
+    return value
 
 
 def _key_to_frozenset_converter(dtype, key):

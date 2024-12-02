@@ -1,3 +1,4 @@
+from stimula.stml.sql import types_renderer
 from stimula.stml.sql.types_renderer import TypesRenderer, json_to_dict, memoryview_to_string_converter
 from stimula.stml.stml_parser import StmlParser
 
@@ -75,3 +76,31 @@ def test_memoryview_to_string_converter_empty_value():
     # test that the converter can handle an empty memoryview
     string = memoryview_to_string_converter(None)
     assert string == None
+
+
+def test_substitute():
+    # test simple substitution
+    substitutions = {'my domain': {'my value': 'my subst'}}
+    subst = types_renderer._substitute(substitutions, 'my domain', 'my value')
+    assert subst == 'my subst'
+
+
+def test_substitute_fallback():
+    # test that substitution falls back on original value if no substitution is found
+    substitutions = {'my domain': {'my value': 'my subst'}}
+    subst = types_renderer._substitute(substitutions, 'my domain', 'subst')
+    assert subst == 'subst'
+
+
+def test_substitute_empty_value():
+    # test that substitution falls back on original value if no substitution is found
+    substitutions = {'my domain': {'my value': 'my subst'}}
+    subst = types_renderer._substitute(substitutions, 'my domain', '')
+    assert subst == ''
+
+
+def test_substitute_regex():
+    # test that substitution matches a regular expression
+    substitutions = {'my domain': {'my va...': 'my subst'}}
+    subst = types_renderer._substitute(substitutions, 'my domain', 'my value')
+    assert subst == 'my subst'
