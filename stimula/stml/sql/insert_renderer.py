@@ -47,7 +47,7 @@ class InsertClauseRenderer:
         assert attributes, f'No attributes to insert in table {mapping.name}'
 
         # comma separate
-        return f'insert into {mapping.name}({', '.join(attributes)})'
+        return f"insert into {mapping.name}({', '.join(attributes)})"
 
 
 class SelectClauseRenderer:
