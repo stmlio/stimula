@@ -9,6 +9,9 @@ DB_USER = 'odoo'
 DB_PASS = 'odoo'
 STIMULA_KEY = "secret"
 
+def test_empty_cmd():
+    call_main(f'stimula')
+
 
 def test_auth():
     call_main(f'stimula auth -k {STIMULA_KEY} -d {DB_NAME} -u {DB_USER} -p {DB_PASS} -V')

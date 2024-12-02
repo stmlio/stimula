@@ -119,13 +119,17 @@ class SelectClauseRenderer:
 class JoinClauseRenderer:
     def render(self, mapping: Entity):
         table_name = mapping.name
-        # glue cells together, skip empty columns
-        return ''.join([self._attribute(a, table_name) for a in mapping.attributes if a])
 
-    def _attribute(self, attribute: AbstractAttribute, alias):
+        # get join clauses
+        clauses = list(chain(*[self._attribute(a, table_name, a.unique) for a in mapping.attributes if a]))
+
+        # glue cells together, skip empty columns
+        return ''.join(clauses)
+
+    def _attribute(self, attribute: AbstractAttribute, alias, unique: bool) -> List[str]:
         # if no foreign key, return empty string
         if isinstance(attribute, Attribute):
-            return ''
+            return []
 
         if isinstance(attribute, Reference):
             # but table names may need an alias
@@ -144,18 +148,19 @@ class JoinClauseRenderer:
 
             # if this is an Odoo style extension relation, then we need to filter by qualifier (module) and table (model)
             if attribute.qualifier:
-                # for an extension table, we should do a double join instead of a left join, because we want to skip records that don't have an extension record
-                join_clause = join_clause.replace(' left join ', ' join ')
+                if unique:
+                    # for an extension table in a unique attribute, we should do an inner join instead of a left join, because we want to skip records that don't have an extension record
+                    join_clause = join_clause.replace(' left join ', ' join ')
+
                 # assume for now that alias is the table name. This is fine as long as we're not joining the same table multiple times
                 table_name = SelectRenderer().get_model_name(alias)
                 join_clause += f' and {target_alias}.model = \'{table_name}\' and {target_alias}.module = \'{attribute.qualifier}\''
 
             # recurse
-            return join_clause + self._attributes(attribute.attributes, target_alias)
+            return [join_clause] + self._attributes(attribute.attributes, target_alias, unique)
 
-    def _attributes(self, attributes: List[AbstractAttribute], alias):
-        attribute_list = [self._attribute(attribute, alias) for attribute in attributes]
-        return ''.join(attribute_list)
+    def _attributes(self, attributes: List[AbstractAttribute], alias, unique: bool) -> List[str]:
+        return list(chain(*[self._attribute(attribute, alias, unique) for attribute in attributes]))
 
 
 class OrderByClauseRenderer:

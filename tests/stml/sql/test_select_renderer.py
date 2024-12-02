@@ -76,15 +76,17 @@ def test_foreign_key_filter_clause(books, model_enricher, context):
 
 
 def test_extension(books, model_enricher, context, ir_model_data):
+    # test that for a non-unique extension, we do a left outer join to return all records, also those without the extension record
     table_name = 'books'
     header = 'title[unique=true], bookid(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_books]'
     mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
     result = SelectRenderer().render(mapping)
-    expected = "select books.title, ir_model_data.name from books join ir_model_data on books.bookid = ir_model_data.res_id and ir_model_data.model = 'books' and ir_model_data.module = 'netsuite_books' order by books.title"
+    expected = "select books.title, ir_model_data.name from books left join ir_model_data on books.bookid = ir_model_data.res_id and ir_model_data.model = 'books' and ir_model_data.module = 'netsuite_books' order by books.title"
     assert result == expected
 
 
 def test_extension_in_foreign_table(books, model_enricher, context, ir_model_data):
+    # test that for a non-unique extension in a joined table, we do a left outer join to return all records, also those without the extension record
     table_name = 'books'
     header = 'title[unique=true], authorid(author_id(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_authors])'
 
@@ -92,5 +94,27 @@ def test_extension_in_foreign_table(books, model_enricher, context, ir_model_dat
     result = SelectRenderer().render(mapping)
     expected = ("select books.title, ir_model_data.name from books "
                 "left join authors on books.authorid = authors.author_id "
-                "join ir_model_data on authors.author_id = ir_model_data.res_id and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' order by books.title")
+                "left join ir_model_data on authors.author_id = ir_model_data.res_id and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' order by books.title")
+    assert result == expected
+
+def test_extension_unique(books, model_enricher, context, ir_model_data):
+    # test that for a unique extension, we do an inner join to only return records that have the matching extension record
+    table_name = 'books'
+    header = 'title[unique=true], bookid(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_books: unique=true]'
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
+    result = SelectRenderer().render(mapping)
+    expected = "select books.title, ir_model_data.name from books join ir_model_data on books.bookid = ir_model_data.res_id and ir_model_data.model = 'books' and ir_model_data.module = 'netsuite_books' order by books.title, ir_model_data.name"
+    assert result == expected
+
+
+def test_extension_in_foreign_table_unique(books, model_enricher, context, ir_model_data):
+    # test that for a unique extension in a joined table, we do an inner join to only return records that have the matching extension record
+    table_name = 'books'
+    header = 'title[unique=true], authorid(author_id(name)[table=ir_model_data: target-name=res_id: qualifier=netsuite_authors])[unique=true]'
+
+    mapping = model_enricher.enrich(StmlParser().parse_csv(table_name, header))
+    result = SelectRenderer().render(mapping)
+    expected = ("select books.title, ir_model_data.name from books "
+                "left join authors on books.authorid = authors.author_id "
+                "join ir_model_data on authors.author_id = ir_model_data.res_id and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' order by books.title, ir_model_data.name")
     assert result == expected
