@@ -126,3 +126,26 @@ def test_escaped_strings():
         Attribute('description', default_value='this, is a book', enabled=True)
     ])
     assert result == expected
+
+def test_key_in_attribute():
+    table_name = 'books'
+    header = 'title[unique=true], price[key=nl_NL]'
+    result = StmlParser().parse_csv(table_name, header)
+    expected = Entity('books', [
+        Attribute('title', unique=True, enabled=True),
+        Attribute('price', key='nl_NL', enabled=True)
+    ])
+    assert result == expected
+
+def test_key_in_reference():
+    # test that a reference can have a key, this is needed for Odoo properties that are company specific
+    table_name = 'books'
+    header = 'title[unique=true], authorid(name[key=nl_NL])[key=2]'
+    result = StmlParser().parse_csv(table_name, header)
+    expected = Entity('books', [
+        Attribute('title', unique=True, enabled=True),
+        Reference('authorid', enabled=True, key='2', attributes=[
+            Attribute('name', key='nl_NL')
+        ])
+    ])
+    assert result == expected
