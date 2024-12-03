@@ -17,7 +17,7 @@ _logger = logging.getLogger(__name__)
 
 
 class CsvReader:
-    def read_from_request(self, mapping, body, skiprows, post_script=None, substitutions_map: dict=None):
+    def read_from_request(self, mapping, body, skiprows, nrows=None, post_script=None, substitutions_map: dict = None):
 
         # get columns and unique columns. Include all columns, including skip and orm-only columns.
         column_names = HeaderRenderer().render_list(mapping, include_skip=True, include_orm_only=True)
@@ -73,6 +73,7 @@ class CsvReader:
             index_col=initial_index_columns,
             skipinitialspace=True,
             skiprows=skiprows,
+            nrows=nrows,
             # skip the empty column names that we renamed to skip, skip1, etc
             usecols=initial_usecols,
             parse_dates=parse_dates,

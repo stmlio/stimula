@@ -47,16 +47,16 @@ class Invoker:
     def get_table(self, table, header, query):
         return self._db.get_table_as_csv(table, header, query)
 
-    def post_table(self, table, header, query, files, skiprows, insert, update, delete, execute, commit, format, post_script, context, substitutions):
+    def post_table(self, table, header, query, files, skiprows, nrows, insert, update, delete, execute, commit, format, post_script, context, substitutions):
 
         if format == None or format == 'diff':
             # post table and get diff dataframes
-            post_result = self._db.post_table_get_diff(table, header, query, files, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script)
+            post_result = self._db.post_table_get_diff(table, header, query, files, skiprows=skiprows, nrows=nrows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script)
             # convert dataframes to CSV response body
             return '\n\n'.join([df.to_csv(index=False) for df in post_result])
         elif format == 'sql':
             # post table and get sql
-            post_result = self._db.post_table_get_sql(table, header, query, files, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script)
+            post_result = self._db.post_table_get_sql(table, header, query, files, skiprows=skiprows, nrows=nrows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script)
             # convert df to response body, use double quotes where needed
             return post_result.to_csv(index=False, quotechar="\"")
         elif format == 'full' and len(files) == 1:
@@ -66,11 +66,11 @@ class Invoker:
             context = context[0] if context and len(context) == 1 else None
             substitutions = substitutions[0].decode('utf-8') if substitutions[0] else None
             # post table and get full report
-            post_result = self._db.post_table_get_full_report(table[0], header, query, body, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script, context=context, substitutions=substitutions)
+            post_result = self._db.post_table_get_full_report(table[0], header, query, body, skiprows=skiprows, nrows=nrows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script, context=context, substitutions=substitutions)
             # return json as string
             return post_result
         elif len(files) > 1:
-            post_result = self._db.post_multiple_tables_get_full_report(table, header, query, files, skiprows=skiprows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script, context=context)
+            post_result = self._db.post_multiple_tables_get_full_report(table, header, query, files, skiprows=skiprows, nrows=nrows, insert=insert, update=update, delete=delete, execute=execute, commit=commit, post_script=post_script, context=context)
             return post_result
 
 

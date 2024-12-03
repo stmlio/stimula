@@ -71,7 +71,7 @@ class Invoker:
         # return the token from json response
         return self.get(path, params).text
 
-    def post_table(self, tables, header, query, files, skiprows, insert, update, delete, execute, commit, format, post_script, context, substitutions):
+    def post_table(self, tables, header, query, files, skiprows, nrows, insert, update, delete, execute, commit, format, post_script, context, substitutions):
         assert files is not None and len(files) > 0, 'Provide one or more files to post'
 
         assert len(tables) == len(files), "Provide exactly one file per table, not %s" % len(files)
@@ -85,6 +85,9 @@ class Invoker:
             params = {"h": header, "q": query, 'skiprows': skiprows, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit,
                       'style': format}
 
+            if nrows is not None:
+                params['nrows'] = nrows
+
             # return the result from json response
             return self.post(path, params=params, data=files[0]).json()
 
@@ -94,6 +97,9 @@ class Invoker:
 
             # send filter as query parameter
             params = {'t': ','.join(tables), 'h': header, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit}
+
+            if nrows is not None:
+                params['nrows'] = nrows
 
             # zip table names and files to create file dictionary for post request. Make sure the keys are unique
             file_map = {f'file{suffix}': (file_name, file, 'text/csv') for suffix, file_name, file in zip(range(len(files)), context, files)}

@@ -32,6 +32,7 @@ Options:
 -m, --mapping     Mapping header
 -f, --file        Path to the file to post (required for post command)
 -s, --skip        Number of rows to skip (default: 1)
+-n, --nrows       Number of rows to read (default: all)
 -e, --enable      Enable flags (I, U, D, E, C)
 -F, --format      Response format (choices: diff, sql)
 -v, --version     Print version information
@@ -94,6 +95,7 @@ class StimulaCLI:
         parser.add_argument('-m', '--mapping', help='Mapping header')
         parser.add_argument('-f', '--files', nargs='+', help='One or more paths to the files to post')
         parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
+        parser.add_argument('-n', '--nrows', help='Number of rows to read', type=int, default=None)
         parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
         parser.add_argument('-v', '--version', action='version', version=version('stimula'))
         parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
@@ -207,12 +209,16 @@ class StimulaCLI:
                 assert not args.transpose, 'Cannot transpose mapping when reading header from data file.'
                 # leave it to the server to use first line of contents as mapping
 
+            # don't specify nrows and delete together
+            assert not (args.nrows and args.delete), 'Cannot specify --nrows (n) and --delete (D) together. That would result in unexpected deletes.'
+
             # if verbose, print mapping
             if args.verbose and args.mapping:
                 print(f'Mapping: {args.mapping}')
 
             result = invoker.post_table(tables, args.mapping, args.query, files,
                                         skiprows=args.skip,
+                                        nrows=args.nrows,
                                         insert=args.insert,
                                         update=args.update,
                                         delete=args.delete,
@@ -276,7 +282,8 @@ class StimulaCLI:
                     data = json.load(file)
                     args.token = data.get('token')
                     args.remote = data.get('remote')
-            except json:
+            # catch any errors,
+            except Exception:
                 print('Error reading token from file. Please re-authenticate.')
                 pass
 

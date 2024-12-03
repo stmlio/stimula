@@ -42,7 +42,7 @@ def test_post_stml_file(mock_isatty):
 
 @patch('sys.stdin.isatty', return_value=True)
 def test_post_multiple_files(mock_isatty):
-    call_main(f'stimula post -r {REMOTE} -t res_users res_partner -f csv/res_users.csv csv/res_partner.csv -IUC -V')
+    call_main(f'stimula post -r {REMOTE} -t res_users res_partner -f csv/res_users.csv csv/res_partner.csv -IUC -V -n 10')
 
 
 @patch('sys.stdin.isatty', return_value=True)

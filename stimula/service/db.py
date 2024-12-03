@@ -149,9 +149,9 @@ class DB:
         # convert dataframe to csv
         return df.to_csv(index=False, escapechar=escapechar)
 
-    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None, orm=None):
+    def post_table_get_diff(self, table_name, header, where_clause, body, skiprows=0, nrows=None, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None, orm=None):
         # create diffs and sql
-        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm)
+        diffs, sql = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, nrows, insert, update, delete, post_script, context, orm)
         # if execute
         if execute:
             # execute sql statements
@@ -164,9 +164,9 @@ class DB:
 
         return diffs
 
-    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None):
+    def post_table_get_sql(self, table_name, header, where_clause, body, skiprows=0, nrows=None, insert=False, update=False, delete=False, execute=False, commit=False, post_script=None, context=None):
         # create diffs and sql
-        _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context)
+        _, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, nrows, insert, update, delete, post_script, context)
 
         # execute sql statements, or fake if execute is false
         sqls = ExecutorService().execute_sql(query_executors, execute, commit)
@@ -174,22 +174,22 @@ class DB:
         # convert sql to dataframe
         return self._convert_to_df(sqls, execute)
 
-    def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
+    def post_table_get_full_report(self, table_name, header, where_clause, body, skiprows=0, nrows=None, insert=False, update=False, delete=False, execute=False, commit=False,
                                    post_script=None, context=None, substitutions=None):
 
         # create orm service if function is provided
         orm: Optional[AbstractORM] = self._orm_function() if self._orm_function else None
 
         # create diffs and sql
-        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm=orm, substitutions=substitutions)
+        diff, query_executors = self._get_diffs_and_sql(table_name, header, where_clause, body, skiprows, nrows, insert, update, delete, post_script, context, orm=orm, substitutions=substitutions)
 
         # execute sql statements
         execution_results = ExecutorService().execute_sql(query_executors, execute, commit)
 
         # create full report
-        return Reporter().create_post_report([table_name], [body], [context], execution_results, execute, commit, skiprows)
+        return Reporter().create_post_report([table_name], [body], [context], execution_results, execute, commit, skiprows, nrows)
 
-    def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False,
+    def post_multiple_tables_get_full_report(self, table_names, header, where_clause, contents, skiprows=0, nrows=None, insert=False, update=False, delete=False, execute=False, commit=False,
                                              post_script=None, context=None, substitutions=None):
         assert len(table_names) == len(contents), f"Provide exactly one file for each table name, so {len(table_names)}, not {len(contents)}"
         assert header is None, "Header must be None when posting multiple tables"
@@ -212,14 +212,14 @@ class DB:
             header = text_content.split('\n', 1)[0]
 
             # create diffs and sql
-            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, insert, update, delete, post_script, file_context, orm=orm, substitutions=text_substitutions)
+            _, qe = self._get_diffs_and_sql(table_name, header, where_clause, text_content, skiprows, nrows, insert, update, delete, post_script, file_context, orm=orm, substitutions=text_substitutions)
             query_executors.extend(qe)
 
         # execute sql statements
         execution_results = ExecutorService().execute_sql(query_executors, execute, commit)
 
         # create full report
-        return Reporter().create_post_report(table_names, contents, context, execution_results, execute, commit, skiprows)
+        return Reporter().create_post_report(table_names, contents, context, execution_results, execute, commit, skiprows, nrows)
 
     def _convert_to_df(self, sqls, showResult):
         # create empty pandas dataframe. First column contains sql
@@ -254,10 +254,10 @@ class DB:
         # return dataframe
         return result
 
-    def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, insert=False, update=False, delete=False, execute=False, commit=False):
+    def post_table_get_summary(self, table_name, header, where_clause, body, skiprows=0, nrows=None, insert=False, update=False, delete=False, execute=False, commit=False):
         pass
 
-    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None, substitutions: str=None):
+    def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, nrows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None, substitutions: str=None):
 
         # if header is empty and skiprows is 1, then take the first line as header
         if not header and skiprows == 1:
@@ -283,7 +283,7 @@ class DB:
         for mapping in mappings:
 
             # read dataframe from request first, so we can give feedback on errors in the request
-            df_request = CsvReader().read_from_request(mapping, body, skiprows, post_script, substitutions_map)
+            df_request = CsvReader().read_from_request(mapping, body, skiprows, nrows, post_script, substitutions_map)
 
             # read dataframe from DB
             df_db = DbReader().read_from_db(mapping, where_clause, set_index=True)

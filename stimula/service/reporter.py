@@ -9,7 +9,7 @@ from stimula.service.query_executor import OperationType
 
 
 class Reporter:
-    def create_post_report(self, tables, contents, contexts, execution_results, execute, commit, skiprows):
+    def create_post_report(self, tables, contents, contexts, execution_results, execute, commit, skiprows, nrows):
 
         summary = {
             'execute': execute,
@@ -23,7 +23,7 @@ class Reporter:
 
         try:
             # count number of rows in all contents.
-            summary['rows'] = sum([self._count_rows(content, skiprows) for content in contents])
+            summary['rows'] = sum([self._count_rows(content, skiprows, nrows) for content in contents])
         except:
             # if counting fails, do nothing
             pass
@@ -78,7 +78,7 @@ class Reporter:
         # Return the hexadecimal representation of the hash
         return md5_hash.hexdigest()
 
-    def _count_rows(self, content, skiprows):
+    def _count_rows(self, content, skiprows, nrows):
         # decode the input string, or leave if it's already a string
         if isinstance(content, bytes):
             content = content.decode('utf-8')
