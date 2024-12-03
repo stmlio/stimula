@@ -96,7 +96,7 @@ class Invoker:
             path = f"tables"
 
             # send filter as query parameter
-            params = {'t': ','.join(tables), 'h': header, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit}
+            params = {'t': ','.join(tables), 'h': header, 'skiprows': skiprows, 'insert': insert, 'update': update, 'delete': delete, 'execute': execute, 'commit': commit}
 
             if nrows is not None:
                 params['nrows'] = nrows

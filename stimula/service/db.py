@@ -193,7 +193,7 @@ class DB:
                                              post_script=None, context=None, substitutions=None):
         assert len(table_names) == len(contents), f"Provide exactly one file for each table name, so {len(table_names)}, not {len(contents)}"
         assert header is None, "Header must be None when posting multiple tables"
-        assert skiprows == 1, "Skiprows must be 1 when posting multiple tables"
+        assert skiprows >= 1, "Skiprows must be at least 1 when posting multiple tables"
         assert post_script is None, "Post script must be None when posting multiple tables"
         assert context is not None and len(context) == len(table_names), "Provide exactly one context for each table name, not %s" % len(context or [])
 
