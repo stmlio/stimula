@@ -79,7 +79,8 @@ class CreateOrmExecutor(OrmExecutor):
     def _execute_orm_method(self, model_name: str, values: dict):
         new_record = self._orm.create(model_name, values)
         if not new_record:
-            return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self._query, self._query_values, self.context)
+            error = "Failed to create record."
+            return ExecutionResult(self.line_number, self.operation_type, False, 0, self.table_name, self._query, self._query_values, self.context, error)
 
         return ExecutionResult(self.line_number, self.operation_type, True, 1, self.table_name, self._query, self._query_values, self.context, new_record)
 

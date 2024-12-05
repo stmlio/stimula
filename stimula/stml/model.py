@@ -75,16 +75,17 @@ class AbstractAttribute(ABC):
 class Attribute(AbstractAttribute):
     def __init__(self, name: str, unique=False, skip=False, exp='', default_value=None, orm_only=False, enabled: bool = False, primary_key: bool = False, in_use: bool = False, default: bool = False,
                  deduplicate: bool = False, substitute: str = None,
-                 key: str = None, type: str = None, parameter: str = None, filter: str = None, api: str = None, url: str = None) -> None:
+                 key: str = None, type: str = None, parameter: str = None, filter: str = None, api: str = None, url: str = None, auth: str = None) -> None:
         super().__init__(name, unique, skip, exp, default_value, orm_only, enabled, primary_key, in_use, default, deduplicate, substitute, key)
         self.type: str = type
         self.parameter: str = parameter
         self.filter: str = filter
         self.api: str = api
         self.url: str = url
+        self.auth: str = auth
 
     def to_dict(self) -> Dict[str, any]:
-        data = super().to_dict() | {"type": self.type, "parameter": self.parameter, "filter": self.filter, "api": self.api, "url": self.url}
+        data = super().to_dict() | {"type": self.type, "parameter": self.parameter, "filter": self.filter, "api": self.api, "url": self.url, "auth": self.auth}
         return {key: value for key, value in data.items() if value}
 
     def __eq__(self, other: object) -> bool:
@@ -96,7 +97,8 @@ class Attribute(AbstractAttribute):
             and _none_safe_compare(self.parameter, other.parameter) \
             and _none_safe_compare(self.filter, other.filter) \
             and _none_safe_compare(self.api, other.api) \
-            and _none_safe_compare(self.url, other.url)
+            and _none_safe_compare(self.url, other.url) \
+            and _none_safe_compare(self.auth, other.auth)
 
 
 class Reference(AbstractAttribute):

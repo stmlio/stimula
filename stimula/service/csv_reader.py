@@ -225,7 +225,7 @@ class CsvReader:
                 # iterate rows and invoke the api
                 for index, row in df.iterrows():
                     # read document and add the binary response to the row in the DataFrame
-                    df.at[index, column_name] = ApiReader().read_document(attribute.url, row.to_dict())
+                    df.at[index, column_name] = ApiReader().read_document(attribute, row.to_dict())
 
         # restore column names
         df.columns = original_column_names
