@@ -48,6 +48,19 @@ def test_create_select_query(model_enricher, ir_attachment):
     assert result == expected
 
 
+def test_create_select_query_with_nested_reference(model_enricher, ir_attachment):
+    # test that we can create a select query with a nested reference in res_id
+    table_name = 'ir_attachment'
+    header = 'res_id(title: authorid(name))[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="checksum(file)": unique=true]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = SelectRenderer().render(mapping)
+    expected = 'select books.title || \':\' || authors.name, ir_attachment.name, ir_attachment.res_model, ir_attachment.checksum ' \
+               'from ir_attachment left join books on ir_attachment.res_id = books.bookid ' \
+               'left join authors on books.authorid = authors.author_id ' \
+               'order by books.title, authors.name, ir_attachment.res_model, ir_attachment.checksum'
+    assert result == expected
+
+
 def test_run_select_query(model_enricher, ir_attachment):
     table_name = 'ir_attachment'
     header = 'res_id(title)[table=books: target-name=bookid: unique=true], guid[skip=true], name, res_model[default-value="account.move": unique=true], file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)": unique=true]'
@@ -70,6 +83,20 @@ def test_file_connector_api():
     assert response.status_code == 200
     assert response.headers['Content-Type'] == 'application/pdf'
     assert response.headers['Content-Disposition'] == 'attachment; filename=attachment.pdf'
+
+def _test_afas_fileconnector_api():
+    url = 'https://50677.rest.afas.online/profitrestservices/fileconnector/{guid}/{name}'
+    params = {'guid': '7A1CEDB642077E2D8C7E97A7EBBB7234', 'name': '1106156.pdf'}
+    url_expanded = url.format(**params)
+
+    # authorization header
+    headers = {
+        'Authorization': 'AfasToken xxxx'
+    }
+    # send http GET request to url_expanded
+    response = requests.get(url_expanded, headers=headers)
+    assert response.status_code == 200
+    assert response.headers['Content-Type'] == 'application/json; charset=utf-8'
 
 
 def test_read_csv_and_get_from_api(model_enricher):
@@ -117,17 +144,10 @@ def test_checksum_eval():
 
 
 def test_checksum_expression_in_csv():
-    # file[api=rest: url="https://api.stml.io/fileconnector/{guid}/{name}": skip=true], checksum[exp="@checksum(file)"]
-    # zipcode[exp="@zipcode(city)"]
-    # my_color[exp="@substitute(your_color, filename)"]
     mapping = Entity('name', attributes=[
         Attribute('file'),
         Attribute('checksum', exp='@checksum(file)')
     ])
-    # mapping = {'columns': [
-    #     {'attributes': [{'name': 'file'}]},
-    #     {'attributes': [{'name': 'checksum'}], 'exp': '@checksum(file)'}
-    # ]}
 
     csv = 'some string,'
     df = CsvReader().read_from_request(mapping, csv, 0)
