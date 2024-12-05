@@ -1,3 +1,5 @@
+import base64
+
 import requests
 
 from stimula.stml.model import Attribute
@@ -49,5 +51,8 @@ class ApiReader:
         assert filename == expected_name, f"AFAS document name {filename} does not match expected name {expected_name}"
         assert 'filedata' in response_json, "AFAS response does not contain filedata"
 
+        # decode filedata from base64
+        document = base64.b64decode(response_json['filedata'])
+
         # return document
-        return response_json['filedata']
+        return document

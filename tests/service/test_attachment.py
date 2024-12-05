@@ -84,20 +84,6 @@ def test_file_connector_api():
     assert response.headers['Content-Type'] == 'application/pdf'
     assert response.headers['Content-Disposition'] == 'attachment; filename=attachment.pdf'
 
-def _test_afas_fileconnector_api():
-    url = 'https://50677.rest.afas.online/profitrestservices/fileconnector/{guid}/{name}'
-    params = {'guid': '7A1CEDB642077E2D8C7E97A7EBBB7234', 'name': '1106156.pdf'}
-    url_expanded = url.format(**params)
-
-    # authorization header
-    headers = {
-        'Authorization': 'AfasToken xxxx'
-    }
-    # send http GET request to url_expanded
-    response = requests.get(url_expanded, headers=headers)
-    assert response.status_code == 200
-    assert response.headers['Content-Type'] == 'application/json; charset=utf-8'
-
 
 def test_read_csv_and_get_from_api(model_enricher):
     table_name = 'ir_attachment'
