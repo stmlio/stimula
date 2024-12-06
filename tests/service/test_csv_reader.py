@@ -124,6 +124,25 @@ def test_concat():
 
     assert df.values.tolist() == expected
 
+def test_concat():
+    # test that the @concat function can deal with constants
+    table_name = 'any'
+    header = 'a, b, c, "xyz[exp=""@concat(\':\', True, a, \'suffix\')""]"'
+    mapping = StmlParser().parse_csv(table_name, header)
+    body = '''
+        a, b, c,
+         , b, c,
+    '''
+
+    df = csv_reader.read_from_request(mapping, body, 0)
+
+    expected = [
+        [0, 'a', 'b', 'c', '"a":"suffix"'],
+        [1, '', 'b', 'c', '"suffix"'],
+    ]
+
+    assert df.values.tolist() == expected
+
 
 def test_fallback():
     # test that the @fallback function falls back to the first non-empty value

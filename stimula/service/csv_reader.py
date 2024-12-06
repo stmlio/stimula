@@ -383,10 +383,24 @@ def _base64encode(x: str | bytes | None) -> str | None:
 
 
 def concat(*series):
+    # copy tuple into a list
+    series_list = list(series)
+
     # concat function for custom expression. Return concatenated string for all items in series. Return as type 'string'.
-    sep = series[0] or ''
-    enc = '"' if bool(series[1]) else ''
-    return pd.Series(list(zip(*series[2:]))).apply(lambda s: _concat(sep, enc, s)).astype('string')
+    sep = series_list[0] or ''
+    enc = '"' if bool(series_list[1]) else ''
+
+    # get the length of the longest series
+    max_len = max(len(s) for s in series_list if isinstance(s, pd.Series))
+
+    # expand fixed elements to series of the same value, so we can also concat constant strings
+    for i in range(2, len(series_list)):
+        if not isinstance(series_list[i], pd.Series):
+            # replace with a series of the same value, with length max_len
+            series_list[i] = pd.Series([series_list[i]] * max_len)
+
+    # apply concatenation to all rows
+    return pd.Series(list(zip(*series_list[2:]))).apply(lambda s: _concat(sep, enc, s)).astype('string')
 
 
 # a concat function that accepts 1+ arguments and returns a concatenated string, using first parameter as separator. If second parameter is true, then enclose in quotes
