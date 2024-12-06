@@ -64,13 +64,10 @@ class ParameterExpander:
         mapping_copy = copy.deepcopy(mapping)
 
         for a in mapping_copy.attributes:
-            if isinstance(a, Attribute):
+            if a is not None:
                 a.default_value = self._replace_placeholders(a.default_value, value_map)
                 a.exp = self._replace_placeholders(a.exp, value_map)
                 a.key = self._replace_placeholders(a.key, value_map)
-            if isinstance(a, Reference):
-                a.default_value = self._replace_placeholders(a.default_value, value_map)
-                a.exp = self._replace_placeholders(a.exp, value_map)
 
         return mapping_copy
 
