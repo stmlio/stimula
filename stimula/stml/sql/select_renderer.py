@@ -144,7 +144,12 @@ class JoinClauseRenderer:
             # only add 'as alias' if it's different from table name
             if target_alias != target_table:
                 join_clause += f' as {target_alias}'
-            join_clause += f' on {alias}.{source_name} = {target_alias}.{target_name}'
+
+            # if this is a jsonb field with a key, then cast the column to integer so we can join it with the target
+            if attribute.key:
+                join_clause += f' on cast({alias}.{source_name}->>\'{attribute.key}\' as integer) = {target_alias}.{target_name}'
+            else:
+                join_clause += f' on {alias}.{source_name} = {target_alias}.{target_name}'
 
             # if this is an Odoo style extension relation, then we need to filter by qualifier (module) and table (model)
             if attribute.qualifier:

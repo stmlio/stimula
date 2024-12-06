@@ -97,6 +97,7 @@ def test_extension_in_foreign_table(books, model_enricher, context, ir_model_dat
                 "left join ir_model_data on authors.author_id = ir_model_data.res_id and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' order by books.title")
     assert result == expected
 
+
 def test_extension_unique(books, model_enricher, context, ir_model_data):
     # test that for a unique extension, we do an inner join to only return records that have the matching extension record
     table_name = 'books'
@@ -117,4 +118,25 @@ def test_extension_in_foreign_table_unique(books, model_enricher, context, ir_mo
     expected = ("select books.title, ir_model_data.name from books "
                 "left join authors on books.authorid = authors.author_id "
                 "join ir_model_data on authors.author_id = ir_model_data.res_id and ir_model_data.model = 'authors' and ir_model_data.module = 'netsuite_authors' order by books.title, ir_model_data.name")
+    assert result == expected
+
+
+def test_select_json_field(books, model_enricher):
+    # test that we can select a json field
+    table_name = 'properties'
+    header = 'name[unique=true], jsonb[key=en_US]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = SelectRenderer().render(mapping)
+    expected = "select properties.name, properties.jsonb->>'en_US' from properties order by properties.name"
+    assert result == expected
+
+
+def test_select_json_field_in_reference(books, model_enricher):
+    # test that we can select a json field in a reference. Odoo uses this for company specific properties.
+    # the query must cast the json field to an integer to join it with the target table
+    table_name = 'properties'
+    header = 'name[unique=true], jsonb(title)[key=1: table=books: target-name=bookid]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = SelectRenderer().render(mapping)
+    expected = "select properties.name, books.title from properties left join books on cast(properties.jsonb->>'1' as integer) = books.bookid order by properties.name"
     assert result == expected

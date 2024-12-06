@@ -125,6 +125,16 @@ def test_update_json_field(books, model_enricher):
     assert result == expected
 
 
+def test_update_json_field_in_reference(books, model_enricher):
+    # test that we can update a json field in a reference table. Odoo uses this for company specific properties.
+    table_name = 'properties'
+    header = 'name[unique=true], jsonb(title)[key=1: table=books: target-name=bookid]'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = UpdateRenderer().render(mapping)
+    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{1}', to_jsonb(books.bookid::text)) from books where properties.name = :name and books.title = :title"
+    assert result == expected
+
+
 def test_update_ambiguous_json_field(books, cnx, model_enricher):
     # test that the update query can handle a json field that appears in multiple tables
     with cnx.cursor() as cursor:

@@ -53,5 +53,10 @@ class UpdateClauseRenderer:
             # table names may need an alias
             target_alias = attribute.alias or attribute.table
 
+            # if key is set, then update json field
+            if attribute.key:
+                # use table_name to disambiguate input for jsonb_set
+                return f"{attribute.name} = jsonb_set({table_name}.{attribute.name}, '{{{attribute.key}}}', to_jsonb({target_alias}.{attribute.target_name}::text))"
+
             # no need to recurse
             return f'{attribute.name} = {target_alias}.{attribute.target_name}'
