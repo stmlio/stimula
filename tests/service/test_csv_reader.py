@@ -147,3 +147,47 @@ def test_fallback():
     ]
 
     assert df.values.tolist() == expected
+
+
+def test_filter_src():
+    # test that we can filter out rows based on a condition
+    table_name = 'any'
+    header = 'a, b[filter-src="b != \'1\'"]'
+    mapping = StmlParser().parse_csv(table_name, header)
+    body = '''
+        1, b,
+        2, 1,
+        3, "1",
+        4, ,
+    '''
+
+    df = csv_reader.read_from_request(mapping, body, 0)
+
+    expected = [
+        [0, '1', 'b'],
+        [1, '4', ''],
+    ]
+
+    assert df.values.tolist() == expected
+
+
+def test_filter_src_empty():
+    # test that the we can filter out empty values
+    table_name = 'any'
+    header = 'a, b[filter-src="b != \'\'"]'
+    mapping = StmlParser().parse_csv(table_name, header)
+    body = '''
+        1, b,
+        2,    
+        3, "1",
+        4, ,
+    '''
+
+    df = csv_reader.read_from_request(mapping, body, 0)
+
+    expected = [
+        [0, '1', 'b'],
+        [1, '3', '1'],
+    ]
+
+    assert df.values.tolist() == expected

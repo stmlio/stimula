@@ -88,6 +88,9 @@ class CsvReader:
         # pad dataframe with empty columns if we have more column names in use_columns than exist in the dataframe
         df_padded = self._pad_dataframe_with_empty_columns(df, use_columns, index_columns, converters)
 
+        # filter rows based on expression
+        self._filter_rows(df_padded, mapping, column_names, index_columns)
+
         # invoke apis to retrieve additional data, such as attachments
         self._invoke_apis(df_padded, mapping, index_columns)
 
@@ -194,6 +197,34 @@ class CsvReader:
                 df_padded.set_index(column, append=True, inplace=True)
 
         return df_padded
+
+    def _filter_rows(self, df, mapping, column_names, index_columns):
+        # A column header can contain a python expression to filter rows.
+        # Evaluate these now that we've read all values from CSV, but before invoking APIs and evaluating expressions.
+
+        # drop index, so that we can use index columns in expressions
+        if index_columns:
+            df.reset_index(inplace=True)
+
+        # store original column names so we can restore them later
+        original_column_names = df.columns
+
+        # remove foreign keys and modifiers in column names so we can use the bare names in expressions
+        df.columns = df.columns.str.replace(r'\[.*\]', '', regex=True)
+        df.columns = df.columns.str.replace(r'\(.*\)', '', regex=True)
+
+        # now that we have all data, we can evaluate column expressions.
+        for attribute in mapping.attributes:
+            if attribute and attribute.filter_src:
+                # query to filter rows
+                df.query(attribute.filter_src, inplace=True)
+
+        # restore column names
+        df.columns = original_column_names
+
+        # restore index
+        if index_columns:
+            df.set_index(index_columns, inplace=True)
 
     def _invoke_apis(self, df, mapping: Entity, index_columns):
         # a column header can contain an 'api' modifier. Invoke these now that we've read all values from CSV, but before evaluating expressions.

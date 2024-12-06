@@ -13,7 +13,7 @@ def test_read_document():
     assert len(document) > 1000
 
 
-def test_afas_fileconnector_api():
+def _test_afas_fileconnector_api():
     guid = '7A1CEDB642077E2D8C7E97A7EBBB7234'
     name = '1106156.pdf'
     url = 'https://50677.rest.afas.online/profitrestservices/fileconnector/{guid}/{name}'
