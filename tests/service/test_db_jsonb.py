@@ -317,7 +317,7 @@ def test_update_json(books, db, context, cnx):
     # post jsonb
     result = db.post_table_get_sql('properties', header, None, body, update=True, execute=True)
 
-    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{key 1}', to_jsonb(:jsonb::text)) where properties.name = :name"
+    expected = "update properties set jsonb = jsonb_set(COALESCE(properties.jsonb, '{}'::jsonb), '{key 1}', to_jsonb(:jsonb::text)) where properties.name = :name"
 
     assert (result.values[0] == [1, None, expected, 'name 1', 'value 2']).all()
 

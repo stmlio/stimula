@@ -121,7 +121,7 @@ def test_update_json_field(books, model_enricher):
     header = 'name[unique=true], jsonb[key=en_US]'
     mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
     result = UpdateRenderer().render(mapping)
-    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{en_US}', to_jsonb(:jsonb::text)) where properties.name = :name"
+    expected = "update properties set jsonb = jsonb_set(COALESCE(properties.jsonb, '{}'::jsonb), '{en_US}', to_jsonb(:jsonb::text)) where properties.name = :name"
     assert result == expected
 
 
@@ -131,7 +131,7 @@ def test_update_json_field_in_reference(books, model_enricher):
     header = 'name[unique=true], jsonb(title)[key=1: table=books: target-name=bookid]'
     mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
     result = UpdateRenderer().render(mapping)
-    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{1}', to_jsonb(books.bookid::text)) from books where properties.name = :name and books.title = :title"
+    expected = "update properties set jsonb = jsonb_set(COALESCE(properties.jsonb, '{}'::jsonb), '{1}', to_jsonb(books.bookid::text)) from books where properties.name = :name and books.title = :title"
     assert result == expected
 
 
@@ -147,7 +147,7 @@ def test_update_ambiguous_json_field(books, cnx, model_enricher):
     header = 'name[unique=true], jsonb[key=en_US], propertyid(jsonb[key=en_US])'
     mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
     result = UpdateRenderer().render(mapping)
-    expected = "update properties set jsonb = jsonb_set(properties.jsonb, '{en_US}', to_jsonb(:jsonb::text)), propertyid = properties_1.property_id from properties as properties_1 where properties.name = :name and properties_1.jsonb->>'en_US' = :jsonb_1"
+    expected = "update properties set jsonb = jsonb_set(COALESCE(properties.jsonb, '{}'::jsonb), '{en_US}', to_jsonb(:jsonb::text)), propertyid = properties_1.property_id from properties as properties_1 where properties.name = :name and properties_1.jsonb->>'en_US' = :jsonb_1"
     assert result == expected
 
 

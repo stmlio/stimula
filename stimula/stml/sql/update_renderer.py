@@ -44,8 +44,8 @@ class UpdateClauseRenderer:
         if isinstance(attribute, Attribute):
             # if key is set, then update json field
             if attribute.key:
-                # use table_name to disambiguate input for jsonb_set
-                return f"{attribute.name} = jsonb_set({table_name}.{attribute.name}, '{{{attribute.key}}}', to_jsonb(:{attribute.parameter}::text))"
+                # use table_name to disambiguate input for jsonb_set. Coalesce is used to update existing empty json fields.
+                return f"{attribute.name} = jsonb_set(COALESCE({table_name}.{attribute.name}, '{{}}'::jsonb), '{{{attribute.key}}}', to_jsonb(:{attribute.parameter}::text))"
 
             return f'{attribute.name} = :{attribute.parameter}'
 
@@ -55,8 +55,8 @@ class UpdateClauseRenderer:
 
             # if key is set, then update json field
             if attribute.key:
-                # use table_name to disambiguate input for jsonb_set
-                return f"{attribute.name} = jsonb_set({table_name}.{attribute.name}, '{{{attribute.key}}}', to_jsonb({target_alias}.{attribute.target_name}::text))"
+                # use table_name to disambiguate input for jsonb_set. Coalesce is used to update existing empty json fields.
+                return f"{attribute.name} = jsonb_set(COALESCE({table_name}.{attribute.name}, '{{}}'::jsonb), '{{{attribute.key}}}', to_jsonb({target_alias}.{attribute.target_name}::text))"
 
             # no need to recurse
             return f'{attribute.name} = {target_alias}.{attribute.target_name}'
