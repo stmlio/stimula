@@ -10,7 +10,7 @@ import itertools
 import re
 from itertools import chain
 
-from stimula.stml.model import Entity, Attribute, Reference
+from stimula.stml.model import Entity, AbstractAttribute
 
 
 class ParameterExpander:
@@ -48,8 +48,7 @@ class ParameterExpander:
         regex = r'\$\{([^\}]+)\}'
 
         #         get list of attributes that can contain a placeholder
-        values = list(chain(*[[a.default_value, a.exp, a.key] for a in mapping.attributes if isinstance(a, Attribute)]))
-        values.extend(chain(*[[a.default_value, a.exp] for a in mapping.attributes if isinstance(a, Reference)]))
+        values = list(chain(*[[a.default_value, a.exp, a.key] for a in mapping.attributes if isinstance(a, AbstractAttribute)]))
 
         # find all placeholders in the values
         placeholders = []
