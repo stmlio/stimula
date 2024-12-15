@@ -255,8 +255,12 @@ class CsvReader:
 
                 # iterate rows and invoke the api
                 for index, row in df.iterrows():
-                    # read document and add the binary response to the row in the DataFrame
-                    df.at[index, column_name] = ApiReader().read_document(attribute, row.to_dict())
+                    try:
+                        # read document and add the binary response to the row in the DataFrame
+                        df.at[index, column_name] = ApiReader().read_document(attribute, row.to_dict())
+                    except Exception as e:
+                        # log error and continue to next row
+                        _logger.error(f"Error invoking API for row {index}: {e}")
 
         # restore column names
         df.columns = original_column_names
