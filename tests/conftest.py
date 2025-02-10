@@ -166,6 +166,7 @@ def properties_relation(cnx, books):
         # update books table to create foreign key to properties table
         cr.execute("ALTER TABLE books ADD COLUMN propertyid INTEGER")
         cr.execute("ALTER TABLE books ADD CONSTRAINT fk_books_properties FOREIGN KEY (propertyid) REFERENCES properties(property_id)")
+    cnx.commit()
 
 
 @pytest.fixture

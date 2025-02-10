@@ -107,3 +107,12 @@ def test_insert_json_field(books, model_enricher):
     result = InsertRenderer().render(mapping)
     expected = "insert into properties(name, jsonb) select :name, jsonb_build_object('en_US', :jsonb)"
     assert result == expected
+
+def test_insert_lookup_by_json_field(model_enricher, properties_relation):
+    # test that the insert query can resolve a reference by json field
+    table_name = 'books'
+    header = 'title[unique=true], authorid(name), propertyid(jsonb[key=en_US])'
+    mapping = AliasEnricher().enrich(model_enricher.enrich(StmlParser().parse_csv(table_name, header)))
+    result = InsertRenderer().render(mapping)
+    expected = "insert into books(title, authorid, propertyid) select :title, authors.author_id, properties.property_id from authors, properties where authors.name = :name and properties.jsonb->>'en_US' = :jsonb"
+    assert result == expected
