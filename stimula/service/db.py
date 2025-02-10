@@ -259,8 +259,8 @@ class DB:
 
     def _get_diffs_and_sql(self, table_name, header, where_clause, body, skiprows, nrows, insert, update, delete, post_script, context, orm: Optional[AbstractORM] = None, substitutions: str=None):
 
-        # if header is empty and skiprows is 1, then take the first line as header
-        if not header and skiprows == 1:
+        # if header is empty and skiprows is larger than 0, then take the first line as header
+        if not header and skiprows > 0:
             # get header from first line
             header = body.split('\n', 1)[0]
 

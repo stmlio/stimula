@@ -47,7 +47,7 @@ class Invoker:
     def get_table(self, table, header, query):
         return self._db.get_table_as_csv(table, header, query)
 
-    def post_table(self, table, header, query, files, skiprows, nrows, insert, update, delete, execute, commit, format, post_script, context, substitutions):
+    def post_table(self, table, header, query, files, skiprows, nrows, block_size, insert, update, delete, execute, commit, format, post_script, context, substitutions):
 
         if format == None or format == 'diff':
             # post table and get diff dataframes

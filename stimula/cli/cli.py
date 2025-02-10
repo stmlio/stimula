@@ -96,6 +96,7 @@ class StimulaCLI:
         parser.add_argument('-f', '--files', nargs='+', help='One or more paths to the files to post')
         parser.add_argument('-s', '--skip', help='Number of rows to skip', type=int, default=1)
         parser.add_argument('-n', '--nrows', help='Number of rows to read', type=int, default=None)
+        parser.add_argument('-b', '--block_size', help='Number of rows to send at once', type=int, default=None)
         parser.add_argument('-F', '--format', help='Response format', choices=['diff', 'sql', 'full'], default='full')
         parser.add_argument('-v', '--version', action='version', version=version('stimula'))
         parser.add_argument('-V', '--verbose', action='store_true', help='Increase output verbosity')
@@ -201,6 +202,10 @@ class StimulaCLI:
             else:
                 source = FileSource()
 
+            # don't specify nrows or block_size  together with delete
+            assert not (args.nrows and args.delete), 'Cannot specify --nrows (n) and --delete (D) together. That could result in unexpected deletes.'
+            assert not (args.block_size and args.delete), 'Cannot specify --block_size (b) and --delete (D) together. That could result in unexpected deletes.'
+
             # read files from disk, stdin or google sheets. Also evaluate table and context
             files, tables, context, substitutions = source.read_files(args.files, args.tables, args.context)
 
@@ -209,9 +214,6 @@ class StimulaCLI:
                 assert not args.transpose, 'Cannot transpose mapping when reading header from data file.'
                 # leave it to the server to use first line of contents as mapping
 
-            # don't specify nrows and delete together
-            assert not (args.nrows and args.delete), 'Cannot specify --nrows (n) and --delete (D) together. That would result in unexpected deletes.'
-
             # if verbose, print mapping
             if args.verbose and args.mapping:
                 print(f'Mapping: {args.mapping}')
@@ -219,6 +221,7 @@ class StimulaCLI:
             result = invoker.post_table(tables, args.mapping, args.query, files,
                                         skiprows=args.skip,
                                         nrows=args.nrows,
+                                        block_size=args.block_size,
                                         insert=args.insert,
                                         update=args.update,
                                         delete=args.delete,
