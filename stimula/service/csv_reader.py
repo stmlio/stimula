@@ -3,6 +3,7 @@ import hashlib
 import importlib
 import logging
 import os
+import re
 import sys
 from io import StringIO
 
@@ -293,7 +294,7 @@ class CsvReader:
                 expression = f"{column_name}={attribute.exp}"
 
                 # evaluate the expression, pass custom functions
-                df.eval(expression, inplace=True, local_dict={'checksum': checksum, 'base64encode': base64encode, 'concat': concat, 'fallback': fallback})
+                df.eval(expression, inplace=True, local_dict={'checksum': checksum, 'base64encode': base64encode, 'concat': concat, 'fallback': fallback, 'afas_file_name': afas_file_name})
 
         # restore column names
         df.columns = original_column_names
@@ -422,4 +423,38 @@ def _fallback(args):
     for arg in args:
         if not pd.isna(arg) and not arg == '':
             return arg
+    return ''
+
+
+def afas_file_name(*series):
+    # takes any number of values and returns the first non-null and non-empty value
+    return pd.Series(list(zip(*series))).apply(_afas_file_name).astype('string')
+
+
+def _afas_file_name(args):
+    assert len(args) == 1, f"Expected 1 argument, got {args}"
+    afas_encoding_map = {
+        '/': '_2F',
+        '#': '_23',
+        '&': '_26',
+        ':': '_3A',
+        '?': '_3F',
+        '*': '_2A',
+        '<': '_3C',
+        '>': '_3E',
+        '%': '_25',
+        '+': '_2B',
+        '~': '_7E',
+        '-': '_2D',
+        '@': '_40',
+        '!': '_21',
+        '$': '_24',
+        '_': '_5F',
+        '\'': '_27',
+    }
+    if args[0]:
+        # replace special characters with their afas encoding
+        afas_name = re.sub(r"[/#&:?*<>%+~\-@!$_']", lambda m: afas_encoding_map[m.group()], args[0])
+        return afas_name
+
     return ''

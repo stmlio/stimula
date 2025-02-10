@@ -124,6 +124,7 @@ def test_concat():
 
     assert df.values.tolist() == expected
 
+
 def test_concat():
     # test that the @concat function can deal with constants
     table_name = 'any'
@@ -139,6 +140,26 @@ def test_concat():
     expected = [
         [0, 'a', 'b', 'c', '"a":"suffix"'],
         [1, '', 'b', 'c', '"suffix"'],
+    ]
+
+    assert df.values.tolist() == expected
+
+
+def test_afas_file_name():
+    # test that the @afas_file_name function replaces special characters the AFAS way
+    table_name = 'any'
+    header = 'name, some_other_field, "fixed_name[exp=""@afas_file_name(name)""]"'
+    mapping = StmlParser().parse_csv(table_name, header)
+    body = '''
+        /#&:?*<>%+, some other value,
+        ~-@!$_\', some other other value,
+    '''
+
+    df = csv_reader.read_from_request(mapping, body, 0)
+
+    expected = [
+        [0, '/#&:?*<>%+', 'some other value', '_2F_23_26_3A_3F_2A_3C_3E_25_2B'],
+        [1, '~-@!$_\'', 'some other other value', '_7E_2D_40_21_24_5F_27'],
     ]
 
     assert df.values.tolist() == expected
