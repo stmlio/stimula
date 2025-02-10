@@ -49,3 +49,9 @@ def test_afas_fileconnector_with_underscores():
     # read document as pdf
     assert document[:4] == b'%PDF'
     assert len(document) > 10000
+
+def test_afas_file_name():
+    # test that the afas api can convert a file name to an afas compatible name
+    assert ApiReader()._convert_afas_file_name('factuur_201301597.pdf') == 'factuur_5F201301597.pdf'
+    assert ApiReader()._convert_afas_file_name('/#&:?*<>%+') == '_2F_23_26_3A_3F_2A_3C_3E_25_2B'
+    assert ApiReader()._convert_afas_file_name('~-@!$_\'') == '_7E_2D_40_21_24_5F_27'

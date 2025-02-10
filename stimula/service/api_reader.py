@@ -1,4 +1,5 @@
 import base64
+import re
 
 import requests
 
@@ -8,9 +9,33 @@ from stimula.stml.model import Attribute
 This class reads documents from remote APIs.
 '''
 
+AFAS_ENCODING = {
+    '/': '_2F',
+    '#': '_23',
+    '&': '_26',
+    ':': '_3A',
+    '?': '_3F',
+    '*': '_2A',
+    '<': '_3C',
+    '>': '_3E',
+    '%': '_25',
+    '+': '_2B',
+    '~': '_7E',
+    '-': '_2D',
+    '@': '_40',
+    '!': '_21',
+    '$': '_24',
+    '_': '_5F',
+    '\'': '_27',
+}
+
 
 class ApiReader:
     def read_document(self, attribute: Attribute, params):
+        # if calling the AFAS API, then convert the name to an AFAS compatible name
+        if attribute.api == 'afas' and 'name' in params:
+            params['name'] = self._convert_afas_file_name(params['name'])
+
         # get url, expand placeholders with values from row
         url = attribute.url.format(**params)
 
@@ -56,3 +81,11 @@ class ApiReader:
 
         # return document
         return document
+
+    def _convert_afas_file_name(self, name):
+        if name:
+            # replace special characters with their afas encoding
+            afas_name = re.sub(r"[/#&:?*<>%+~\-@!$_']", lambda m: AFAS_ENCODING[m.group()], name)
+            return afas_name
+
+        return ''
